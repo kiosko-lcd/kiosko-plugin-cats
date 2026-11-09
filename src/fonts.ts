@@ -3,7 +3,7 @@
  * registers (DejaVu, bundled), not the theme's: the room is an illustration
  * and keeps its look whatever theme the panel uses.
  */
-import { FONT_FAMILIES } from '@tessera/sdk';
+import { FONT_FAMILIES } from '@kiosko/sdk';
 
 /** Condensed bold: sign boards, cards. */
 export const COND = FONT_FAMILIES.sansBold;

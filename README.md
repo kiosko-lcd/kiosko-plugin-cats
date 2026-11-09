@@ -1,25 +1,25 @@
-# tessera-plugin-cats
+# kiosko-plugin-cats
 
 Your AI agent sessions as cats in a room: what needs you comes forward. From aimonitor.
 
-A plugin for [Tessera](https://github.com/Loksly/tessera), the widget mosaic for small USB LCD panels.
+A plugin for [Kiosko](https://github.com/kiosko-lcd/kiosko), the widget mosaic for small USB LCD panels.
 
 ![Cats room](docs/room.png)
 
 ## Install
 
-In Tessera, **Plugins → Install from npm** → `tessera-plugin-cats`, then restart Tessera. Or from a terminal:
+In Kiosko, **Plugins → Install from npm** → `kiosko-plugin-cats`, then restart Kiosko. Or from a terminal:
 
 ```sh
-npm install --prefix ~/.config/tessera/plugins tessera-plugin-cats
+npm install --prefix ~/.config/kiosko/plugins kiosko-plugin-cats
 ```
 
-(macOS: `~/Library/Application Support/Tessera/plugins`, Windows: `%APPDATA%\Tessera\plugins`.)
+(macOS: `~/Library/Application Support/Kiosko/plugins`, Windows: `%APPDATA%\Kiosko\plugins`.)
 
 ## Requirements
 
-- The `agents/sessions` source from [tessera-plugin-agents](../tessera-plugin-agents) (each session is a cat).
-- Optional: `weather/current` from [tessera-plugin-weather](../tessera-plugin-weather) for the sky in the window.
+- The `agents/sessions` source from [kiosko-plugin-agents](../kiosko-plugin-agents) (each session is a cat).
+- Optional: `weather/current` from [kiosko-plugin-weather](../kiosko-plugin-weather) for the sky in the window.
 
 ## Widgets
 
@@ -42,7 +42,7 @@ Uses: `agents/sessions`, `weather/current`.
 
 ### Quarter-hour duel — `cats/duel`
 
-Two of your sessions fight it out with laser swords in the cats room. The one with fewer uncommitted files wins. With a single session, it fights the bug. Add it in Tessera → Screens → Interludes.
+Two of your sessions fight it out with laser swords in the cats room. The one with fewer uncommitted files wins. With a single session, it fights the bug. Add it in Kiosko → Screens → Interludes.
 
 | Option | Type | Default | |
 |---|---|---|---|
@@ -54,14 +54,14 @@ Two of your sessions fight it out with laser swords in the cats room. The one wi
 npm install
 npm test          # node:test
 npm run check     # TypeScript
-npm run build     # dist/index.js, what Tessera loads
+npm run build     # dist/index.js, what Kiosko loads
 ```
 
-To try it in a running Tessera without publishing: `tessera plugins link .` and restart Tessera.
+To try it in a running Kiosko without publishing: `kiosko plugins link .` and restart Kiosko.
 
-Working on Tessera and its plugins together: clone them side by side
-(`tessera/` and `tessera-plugins/tessera-plugin-cats/`) and run `npm install` in
-`tessera/`; its workspaces link every plugin found in `../tessera-plugins`.
+Working on Kiosko and its plugins together: clone them side by side
+(`kiosko/` and `kiosko-plugins/kiosko-plugin-cats/`) and run `npm install` in
+`kiosko/`; its workspaces link every plugin found in `../kiosko-plugins`.
 
 ## License
 

@@ -2,7 +2,7 @@
  * The cats room, at rest: every agent session is a cat, and how close it sits
  * says how much it needs you (see layout.ts). Ported from aimonitor's
  * `scene/render.ts` without the gestures, the walking between spots and the
- * card column (in Tessera that column is just other tiles beside the scene).
+ * card column (in Kiosko that column is just other tiles beside the scene).
  *
  * Fur is tens of thousands of strokes: a detailed cat costs ~100 ms. So cats
  * and the room are cached already painted, and each frame only composes them
@@ -11,7 +11,7 @@
  * Everything is designed at 462 units high (`DESIGN_H`) and scaled to the
  * canvas; the width in design units follows the canvas aspect.
  */
-import type { Canvas } from '@tessera/sdk';
+import type { Canvas } from '@kiosko/sdk';
 import type { SunTimes, Weather } from '@loksly/weather-astro';
 import { createCanvas } from './canvas.ts';
 import { COATS, EXTENT, type Pose, backCat, boxGhost, boxSleeper, collarFor, frontCat, hiss, knead, pairHeart, schrodinger, sleepCat } from './cat.ts';

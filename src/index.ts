@@ -7,7 +7,7 @@
  *
  * Plus an interlude: the quarter-hour laser-sword duel between two sessions.
  */
-import { definePlugin, defineInterlude, defineWidget, t, type Localized } from '@tessera/sdk';
+import { definePlugin, defineInterlude, defineWidget, t, type Localized } from '@kiosko/sdk';
 import { sunTimes, type SunTimes, type Weather } from '@loksly/weather-astro';
 import { useCanvas } from './canvas.ts';
 import { DUEL_FPS, planDuel, prerenderDuel } from './duel-egg.ts';
@@ -188,7 +188,7 @@ export default definePlugin({
     en: 'Your AI agent sessions as cats in a room: what needs you comes forward. From aimonitor.',
     es: 'Tus sesiones de agentes IA como gatos en una habitación: lo que te reclama se acerca. De aimonitor.',
   },
-  author: 'Tessera',
+  author: 'Kiosko',
   license: 'MIT',
   icon: 'cat',
   widgets: [room],

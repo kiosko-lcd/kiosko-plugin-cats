@@ -1,24 +1,24 @@
 {
-  "name": "tessera-plugin-cats",
+  "name": "kiosko-plugin-cats",
   "version": "0.1.0",
   "description": "The cats room from aimonitor: every AI agent session is a cat, and the one that needs you comes forward. Plus a quarter-hour laser-sword duel.",
   "type": "module",
   "license": "MIT",
   "author": "Loksly",
   "keywords": [
-    "tessera",
-    "tessera-plugin",
+    "kiosko",
+    "kiosko-plugin",
     "lcd",
     "widgets",
     "scene"
   ],
-  "homepage": "https://github.com/Loksly/tessera-plugin-cats#readme",
+  "homepage": "https://github.com/kiosko-lcd/kiosko-plugin-cats#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Loksly/tessera-plugin-cats.git"
+    "url": "git+https://github.com/kiosko-lcd/kiosko-plugin-cats.git"
   },
   "bugs": {
-    "url": "https://github.com/Loksly/tessera-plugin-cats/issues"
+    "url": "https://github.com/kiosko-lcd/kiosko-plugin-cats/issues"
   },
   "exports": {
     ".": {
@@ -26,7 +26,7 @@
       "default": "./dist/index.js"
     }
   },
-  "tessera": {
+  "kiosko": {
     "plugin": "./dist/index.js",
     "id": "cats"
   },
@@ -49,8 +49,8 @@
     "@loksly/lcd-canvas-kit": "^0.1.0",
     "@loksly/weather-astro": "^0.1.0",
     "@napi-rs/canvas": "^1.0.10",
-    "@tessera/core": "^0.1.0",
-    "@tessera/sdk": "^0.1.0",
+    "@kiosko/core": "^0.1.0",
+    "@kiosko/sdk": "^0.1.0",
     "@types/node": "^24.0.0",
     "esbuild": "^0.25.0",
     "typescript": "^5.9.3"

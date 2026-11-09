@@ -4,7 +4,7 @@
  * canvas), so the widget hands over `ctx.canvas` before painting and the
  * scene code creates its offscreen canvases through here.
  */
-import type { Canvas, CanvasApi } from '@tessera/sdk';
+import type { Canvas, CanvasApi } from '@kiosko/sdk';
 
 let api: CanvasApi | null = null;
 

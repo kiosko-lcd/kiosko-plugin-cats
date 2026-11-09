@@ -3,7 +3,7 @@
  * a darkened room. The one with fewer uncommitted files wins (on a tie, the
  * one that has been like that for less time); a lone session fights "the bug".
  */
-import type { CanvasApi, Graphics, Image, InterludePlayer } from '@tessera/sdk';
+import type { CanvasApi, Graphics, Image, InterludePlayer } from '@kiosko/sdk';
 import type { SunTimes, Weather } from '@loksly/weather-astro';
 import { COATS, COAT_NAMES, collarFor } from './cat.ts';
 import { COND, MONO_BOLD } from './fonts.ts';

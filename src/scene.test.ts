@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createCanvas, loadImage } from '@napi-rs/canvas';
-import { registerFonts } from '@tessera/core';
+import { registerFonts } from '@kiosko/core';
 import { useCanvas } from './canvas.ts';
 import plugin, { demoSessions, demoWeather } from './index.ts';
 import { ROOMS, resolveRoom, roomFor } from './room.ts';
