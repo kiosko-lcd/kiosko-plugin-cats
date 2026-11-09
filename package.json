@@ -1,15 +1,58 @@
 {
-  "name": "@tessera/plugin-cats",
+  "name": "tessera-plugin-cats",
   "version": "0.1.0",
   "description": "The cats room from aimonitor: every AI agent session is a cat, and the one that needs you comes forward. Plus a quarter-hour laser-sword duel.",
   "type": "module",
   "license": "MIT",
-  "exports": { ".": { "source": "./src/index.ts", "default": "./dist/index.js" } },
-  "tessera": { "plugin": "./dist/index.js" },
-  "peerDependencies": {
-    "@tessera/sdk": "*",
-    "@loksly/agent-sessions": "*",
-    "@loksly/lcd-canvas-kit": "*",
-    "@loksly/weather-astro": "*"
+  "author": "Loksly",
+  "keywords": [
+    "tessera",
+    "tessera-plugin",
+    "lcd",
+    "widgets",
+    "scene"
+  ],
+  "homepage": "https://github.com/Loksly/tessera-plugin-cats#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Loksly/tessera-plugin-cats.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Loksly/tessera-plugin-cats/issues"
+  },
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "tessera": {
+    "plugin": "./dist/index.js",
+    "id": "cats"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --conditions=source --test \"src/**/*.test.ts\"",
+    "check": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@loksly/agent-sessions": "^0.1.0",
+    "@loksly/lcd-canvas-kit": "^0.1.0",
+    "@loksly/weather-astro": "^0.1.0",
+    "@napi-rs/canvas": "^1.0.10",
+    "@tessera/core": "^0.1.0",
+    "@tessera/sdk": "^0.1.0",
+    "@types/node": "^24.0.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.3"
   }
 }
