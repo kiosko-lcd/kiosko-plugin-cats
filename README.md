@@ -34,9 +34,10 @@ Uses: `agents/sessions`, `weather/current`.
 | Option | Type | Default | |
 |---|---|---|---|
 | `room` | `rotate` \| `estudio` \| `cocina` \| `cabana` \| `atico` \| `oficina` \| `japonesa` \| `acuario` \| `arcade` \| `ventanal` \| `playa` \| `espacio` \| `antartida` \| `desierto` \| `bosque` | `"rotate"` | Room. Indoors or out, each with its own window, lamp and floor. |
+| `rooms` | list | `[]` | Rooms to rotate through. With "A different one every day". Empty: all of them. |
+| `projects` | list | `[]` | Projects. Which sessions get a cat. Empty: all. Project, repository or folder names or patterns, comma-separated: * matches anything, a leading ! leaves out (web-app, acme-*, !scratch). |
 | `column` | `none` \| `right` \| `left` \| `alternate` | `"none"` | Strip without cats. Keeps a strip of the floor free, like the old card column. "Alternate" swaps sides now and then, against burn-in. |
 | `swapSidesMs` | duration (ms) | `3600000` | Swap sides every |
-| `zombieMinutes` | number | `15` | Silent session looks dead after. A working session silent for half of this turns into Schrödinger's box. |
 
 ## Interludes
 
@@ -47,6 +48,8 @@ Two of your sessions fight it out with laser swords in the cats room. The one wi
 | Option | Type | Default | |
 |---|---|---|---|
 | `room` | `rotate` \| `estudio` \| `cocina` \| `cabana` \| `atico` \| `oficina` \| `japonesa` \| `acuario` \| `arcade` \| `ventanal` \| `playa` \| `espacio` \| `antartida` \| `desierto` \| `bosque` | `"rotate"` | Room. Indoors or out, each with its own window, lamp and floor. |
+| `rooms` | list | `[]` | Rooms to rotate through. With "A different one every day". Empty: all of them. |
+| `projects` | list | `[]` | Projects. Which sessions get a cat. Empty: all. Project, repository or folder names or patterns, comma-separated: * matches anything, a leading ! leaves out (web-app, acme-*, !scratch). |
 
 ## Development
 

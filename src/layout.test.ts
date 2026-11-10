@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import { EXTENT, coatFor } from './cat.ts';
 import { type Actor, type LayoutConfig, MARGIN, RIGHT_ZONE, SHELF_TOP, SILL, columnSide, columnZone, layoutScene, placeTags, sharedDirtyFile, tagText } from './layout.ts';
 import type { SessionView } from './types.ts';
+import { createBaseContext } from '@kiosko/sdk';
 import { wordsFor } from './words.ts';
+
+const wordsIn = (locale: string) => wordsFor(createBaseContext({ now: 0, locale }));
 
 const W = 1920;
 const MIN = 60_000;
@@ -124,8 +127,8 @@ test('cats: the waiting one kneads the working one; the tag says so', () => {
   const L = layoutScene([rec('w', 'active', MIN, same), rec('e', 'waiting', 3 * MIN, same)], T0, CFG, W);
   assert.equal(L.actors[0]!.pose, 'amasa');
   assert.deepEqual(L.actors[0]!.records.map((r) => r.session_id), ['w', 'e']);
-  assert.match(tagText(L.actors[0]!, T0, wordsFor('es')).time, /espera 3 min/);
-  assert.match(tagText(L.actors[0]!, T0, wordsFor('en')).time, /waiting 3 min/);
+  assert.match(tagText(L.actors[0]!, T0, wordsIn('es')).time, /espera 3 min/);
+  assert.match(tagText(L.actors[0]!, T0, wordsIn('en')).time, /waiting 3 min/);
 });
 
 test('cats: they hiss only while the shared file is still uncommitted', () => {

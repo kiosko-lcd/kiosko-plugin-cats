@@ -22,7 +22,7 @@ import { type X, ellipse, hashString, linear, radial } from './paint.ts';
 import { cobweb, deskDuck, devilHorns, meetingDoor, partyHat, tie } from './props.ts';
 import { type RoomName, type Sky, WINDOW, clockPos, daylight, lampX, paintRoom, resolveRoom, skyKey, spaceHelmet, wallClock } from './room.ts';
 import type { SessionView } from './types.ts';
-import { type Words, countdown } from './words.ts';
+import type { Words } from './words.ts';
 
 /** aimonitor's art direction: the room keeps it whatever the panel theme. */
 export const BG = '#090C10';
@@ -37,6 +37,8 @@ export const STATE_COLOR: Record<SessionView['state'], string> = {
 export interface SceneOptions {
   /** `rotate` (a different room every day) or a room name (see `ROOMS`). */
   room: string;
+  /** With `rotate`, the rooms to go through; empty or absent: all of them. */
+  rooms?: readonly string[];
   /** Strip kept free of cats, as the old card column did; `none` uses the whole floor. */
   column: 'none' | ColumnSide | 'alternar';
   swapSidesMs: number;
@@ -512,7 +514,7 @@ export function renderScene(input: SceneInput): Canvas {
   const d = new Date(now);
   const weather = input.weather ?? null;
   const sky = skyOf(now, weather, input.sun);
-  const theme = resolveRoom(options.room, now);
+  const theme = resolveRoom(options.room, now, options.rooms);
   const inSpace = theme === 'espacio';
   drawRoom(ctx, v, height, sky, theme, words);
 
@@ -535,7 +537,7 @@ export function renderScene(input: SceneInput): Canvas {
   const meetingSoon = soon.length > 0;
   if (meetingSoon) {
     const left = soon[0]!.startsAt! - now;
-    meetingDoor(ctx, DOOR_X, 110, 272, words.meeting, left <= 0 ? words.now : words.inTime(countdown(left)));
+    meetingDoor(ctx, DOOR_X, 110, 272, words.meeting, left <= 0 ? words.now : words.inTime(words.countdown(left)));
   }
 
   // Tags are placed before painting anything, nearest first, so they don't overlap (see placeTags).

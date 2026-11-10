@@ -7,12 +7,15 @@ import { COATS } from './cat.ts';
 import { beatAt, crossing, drawDuel, duration, ik, longDuel, shortDuel } from './duel.ts';
 import { duelFrames, duelPlayer, planDuel } from './duel-egg.ts';
 import type { SessionView } from './types.ts';
+import { createBaseContext } from '@kiosko/sdk';
 import { wordsFor } from './words.ts';
+
+const wordsIn = (locale: string) => wordsFor(createBaseContext({ now: 0, locale }));
 
 registerFonts();
 useCanvas({ createCanvas, loadImage });
 const T0 = Date.parse('2026-11-05T10:42:00');
-const es = wordsFor('es');
+const es = wordsIn('es');
 
 test('duel: joints keep the length of the bones', () => {
   const root: [number, number] = [0, 0];
@@ -61,7 +64,7 @@ test('duel: the one with fewer uncommitted files wins', () => {
   assert.deepEqual(plan.names.slice().sort(), ['gd', 'web']);
   assert.equal(plan.names[plan.winner === 'a' ? 0 : 1], 'web');
   assert.match(plan.reason, /ningún fichero/);
-  assert.match(planDuel([rec('gd', 7), rec('web', 0)], T0, wordsFor('en'))!.reason, /no uncommitted files/);
+  assert.match(planDuel([rec('gd', 7), rec('web', 0)], T0, wordsIn('en'))!.reason, /no uncommitted files/);
   assert.notEqual(plan.coats[0], plan.coats[1], 'two different cats');
 });
 

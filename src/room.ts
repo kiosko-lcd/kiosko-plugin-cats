@@ -383,16 +383,21 @@ export const clockPos = (W: number) => ({ x: Math.round(W * 0.73), y: 84, r: 40 
 export const ROOMS = ['estudio', 'cocina', 'cabana', 'atico', 'oficina', 'japonesa', 'acuario', 'arcade', 'ventanal', 'playa', 'espacio', 'antartida', 'desierto', 'bosque'] as const;
 export type RoomName = (typeof ROOMS)[number];
 
-/** Today's room: it changes at midnight and runs through the whole repertoire. */
-export function roomFor(now: number): RoomName {
+/**
+ * Today's room: it changes at midnight and runs through the repertoire, or
+ * through `among` when it names some rooms.
+ */
+export function roomFor(now: number, among: readonly string[] = []): RoomName {
+  const known = ROOMS.filter((r) => among.includes(r));
+  const list = known.length ? known : ROOMS;
   const d = new Date(now);
   const day = Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86_400_000);
-  return ROOMS[((day % ROOMS.length) + ROOMS.length) % ROOMS.length]!;
+  return list[((day % list.length) + list.length) % list.length]!;
 }
 
-/** The one chosen in the config (`scene.room`), or today's if it is "rotate" or does not exist. */
-export function resolveRoom(setting: string | undefined, now: number): RoomName {
-  return (ROOMS as readonly string[]).includes(setting ?? '') ? (setting as RoomName) : roomFor(now);
+/** The one chosen in the config (`scene.room`), or today's (of `among`) if it is "rotate" or does not exist. */
+export function resolveRoom(setting: string | undefined, now: number, among: readonly string[] = []): RoomName {
+  return (ROOMS as readonly string[]).includes(setting ?? '') ? (setting as RoomName) : roomFor(now, among);
 }
 
 interface Theme {

@@ -7,13 +7,13 @@
  *
  * Plus an interlude: the quarter-hour laser-sword duel between two sessions.
  */
-import { definePlugin, defineInterlude, defineWidget, t, type Localized } from '@kiosko/sdk';
+import { definePlugin, defineInterlude, defineWidget, t, type Location, type Localized } from '@kiosko/sdk';
 import { sunTimes, type SunTimes, type Weather } from '@loksly/weather-astro';
 import { useCanvas } from './canvas.ts';
 import { DUEL_FPS, planDuel, prerenderDuel } from './duel-egg.ts';
 import { ROOMS, type RoomName } from './room.ts';
 import { renderScene, type SceneOptions } from './scene.ts';
-import type { SessionView, SessionsData } from './types.ts';
+import { filterProjects, sessionsOf, zombieMsOf, type SessionView } from './types.ts';
 import { wordsFor } from './words.ts';
 
 const ROOM_LABELS: Record<'rotate' | RoomName, Localized> = {
@@ -42,6 +42,17 @@ const roomOptions = t.object({
     help: { en: 'Indoors or out, each with its own window, lamp and floor.', es: 'Dentro o fuera, cada una con su ventana, su lámpara y su suelo.' },
     labels: ROOM_LABELS,
   }),
+  rooms: t.list(t.enum(ROOMS, { labels: ROOM_LABELS }), {
+    label: { en: 'Rooms to rotate through', es: 'Habitaciones por las que rotar' },
+    help: { en: 'With "A different one every day". Empty: all of them.', es: 'Con «Una distinta cada día». Vacío: todas.' },
+  }),
+  projects: t.filter({
+    label: { en: 'Projects', es: 'Proyectos' },
+    help: {
+      en: 'Which sessions get a cat. Empty: all. Project, repository or folder names or patterns, comma-separated: * matches anything, a leading ! leaves out (web-app, acme-*, !scratch).',
+      es: 'Qué sesiones tienen gato. Vacío: todas. Nombres o patrones de proyecto, repositorio o carpeta, separados por comas: * vale por cualquier cosa y un ! delante excluye (web-app, acme-*, !pruebas).',
+    },
+  }),
   column: t.enum(['none', 'right', 'left', 'alternate'] as const, {
     label: { en: 'Strip without cats', es: 'Franja sin gatos' },
     help: {
@@ -56,28 +67,23 @@ const roomOptions = t.object({
     },
   }),
   swapSidesMs: t.duration({ default: 60 * 60_000, min: 60_000, label: { en: 'Swap sides every', es: 'Cambiar de lado cada' }, advanced: true }),
-  zombieMinutes: t.integer({
-    default: 15, min: 1, max: 240, unit: 'min', advanced: true,
-    label: { en: 'Silent session looks dead after', es: 'Una sesión callada parece muerta tras' },
-    help: { en: 'A working session silent for half of this turns into Schrödinger\'s box.', es: 'Una sesión trabajando que calla la mitad de esto se convierte en la caja de Schrödinger.' },
-  }),
 });
 
 type RoomOptions = (typeof roomOptions)['default'];
 
-function sceneOptions(o: RoomOptions): SceneOptions {
-  return { room: o.room, column: COLUMN[o.column], swapSidesMs: o.swapSidesMs, zombieMs: o.zombieMinutes * 60_000 };
+/**
+ * The scene's settings. The zombie threshold is the `agents/sessions`
+ * source's (`zombieMs`): a working session silent for half of it turns into
+ * Schrödinger's box, and at all of it the source drops it.
+ */
+function sceneOptions(o: RoomOptions, zombieMs: number): SceneOptions {
+  return { room: o.room, rooms: o.rooms, column: COLUMN[o.column], swapSidesMs: o.swapSidesMs, zombieMs };
 }
 
-const sessionsOf = (sources: Record<string, unknown>): SessionView[] => {
-  const d = sources['agents/sessions'] as SessionsData | undefined;
-  return Array.isArray(d?.sessions) ? d.sessions : [];
-};
-
-/** Sunrise and sunset for the sky: the reading's coordinates first, then the user's place. */
-function sunFor(now: number, weather: Weather | undefined, location: { latitude: number; longitude: number } | undefined): SunTimes | null {
-  const lat = weather?.latitude ?? location?.latitude;
-  const lon = weather?.longitude ?? location?.longitude;
+/** Sunrise and sunset for the sky: the user's place, or the weather reading's if none is set. */
+export function sunFor(now: number, weather: Weather | undefined, location: Location | undefined): SunTimes | null {
+  const lat = location?.latitude ?? weather?.latitude;
+  const lon = location?.longitude ?? weather?.longitude;
   return lat === undefined || lon === undefined ? null : sunTimes(new Date(now), lat, lon);
 }
 
@@ -135,25 +141,25 @@ export const room = defineWidget({
   sources: ['agents/sessions', 'weather/current'],
   // The wall clock moves every minute.
   redraw: 'minute',
-  idle: ({ sources }) => !sessionsOf(sources).some((s) => s.startsAt === undefined),
+  idle: ({ sources, options }) => !filterProjects(sessionsOf(sources), options.projects).some((s) => s.startsAt === undefined),
   render(g, ctx) {
     const { box, now, options, sources } = ctx;
     useCanvas(ctx.canvas);
     const weather = sources['weather/current'] as Weather | undefined;
     const width = Math.max(1, Math.round(box.w)), height = Math.max(1, Math.round(box.h));
     const frame = renderScene({
-      sessions: sessionsOf(sources),
+      sessions: filterProjects(sessionsOf(sources), options.projects),
       now,
       width,
       height,
-      options: sceneOptions(options),
-      words: wordsFor(ctx.locale),
+      options: sceneOptions(options, zombieMsOf(sources)),
+      words: wordsFor(ctx),
       weather: weather ?? null,
       sun: sunFor(now, weather, ctx.location),
     });
     g.drawImage(frame, box.x, box.y, box.w, box.h);
   },
-  demo: ({ now }) => ({ sources: { 'agents/sessions': { sessions: demoSessions(now) }, 'weather/current': demoWeather(now) } }),
+  demo: ({ now }) => ({ sources: { 'agents/sessions': { sessions: demoSessions(now), zombieMs: 15 * MIN }, 'weather/current': demoWeather(now) } }),
 });
 
 export const duel = defineInterlude({
@@ -164,20 +170,20 @@ export const duel = defineInterlude({
     es: 'Dos de tus sesiones se baten con espadas láser en la habitación de los gatos. Gana la que tiene menos ficheros sin commit. Con una sola, se bate con el bug.',
   },
   icon: 'swords',
-  options: t.object({ room: roomOptions.props.room }),
+  options: t.object({ room: roomOptions.props.room, rooms: roomOptions.props.rooms, projects: roomOptions.props.projects }),
   sources: ['agents/sessions', 'weather/current'],
   fps: DUEL_FPS,
   async prepare(ctx) {
     useCanvas(ctx.canvas);
     const weather = ctx.sources['weather/current'] as Weather | undefined;
-    const words = wordsFor(ctx.locale);
-    const plan = planDuel(sessionsOf(ctx.sources), ctx.now, words);
+    const words = wordsFor(ctx);
+    const plan = planDuel(filterProjects(sessionsOf(ctx.sources), ctx.options.projects), ctx.now, words, zombieMsOf(ctx.sources));
     if (!plan) return null;
-    const input = { plan, width: ctx.width, height: ctx.height, now: ctx.now, room: ctx.options.room, words, weather: weather ?? null, sun: sunFor(ctx.now, weather, ctx.location) };
+    const input = { plan, width: ctx.width, height: ctx.height, now: ctx.now, room: ctx.options.room, rooms: ctx.options.rooms, words, weather: weather ?? null, sun: sunFor(ctx.now, weather, ctx.location) };
     return prerenderDuel(input, ctx.canvas);
   },
   // Not over something that needs you: a permission or a session waiting.
-  skip: ({ sources }) => sessionsOf(sources).some((s) => s.state === 'permission' || s.state === 'waiting'),
+  skip: ({ sources, options }) => filterProjects(sessionsOf(sources), options.projects).some((s) => s.state === 'permission' || s.state === 'waiting'),
 });
 
 export default definePlugin({

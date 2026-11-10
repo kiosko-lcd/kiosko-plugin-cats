@@ -11,7 +11,7 @@ import { type Beat, drawDuel, duration, longDuel } from './duel.ts';
 import { DESIGN_H, layoutScene } from './layout.ts';
 import { resolveRoom } from './room.ts';
 import { drawRoom, roomView, skyOf } from './scene.ts';
-import type { SessionView } from './types.ts';
+import { DEFAULT_ZOMBIE_MS, type SessionView } from './types.ts';
 import type { Words } from './words.ts';
 
 /**
@@ -36,8 +36,8 @@ export interface DuelPlan {
  * Who fights: the first two sessions of the scene (from different projects
  * when possible). With a single one, against the bug; with none, no duel.
  */
-export function planDuel(sessions: SessionView[], now: number, words: Words): DuelPlan | null {
-  const L = layoutScene(sessions, now, { zombieMs: 15 * 60_000, side: 'derecha', swapSidesMs: 0 }, 1920, 0);
+export function planDuel(sessions: SessionView[], now: number, words: Words, zombieMs = DEFAULT_ZOMBIE_MS): DuelPlan | null {
+  const L = layoutScene(sessions, now, { zombieMs, side: 'derecha', swapSidesMs: 0 }, 1920, 0);
   const recs = L.actors.flatMap((a) => a.records.map((r, i) => ({ r, coat: a.coats[i] ?? a.coats[0]! })));
   if (!recs.length) return null;
   const A = recs[0]!;
@@ -67,6 +67,8 @@ export interface DuelInput {
   now: number;
   /** `rotate` or a room name. */
   room: string;
+  /** With `rotate`, the rooms to go through; empty or absent: all of them. */
+  rooms?: readonly string[];
   words: Words;
   weather: Weather | null;
   sun: SunTimes | null;
@@ -80,7 +82,7 @@ export function drawDuelFrame(g: Graphics, o: DuelInput, time: number): void {
   const v = roomView(width, height);
   const { k, W } = v;
   g.setTransform(1, 0, 0, 1, 0, 0);
-  drawRoom(g, v, height, skyOf(o.now, o.weather, o.sun), resolveRoom(o.room, o.now), words);
+  drawRoom(g, v, height, skyOf(o.now, o.weather, o.sun), resolveRoom(o.room, o.now, o.rooms), words);
   g.fillStyle = 'rgba(8,10,20,0.42)';
   g.fillRect(0, 0, width, height);
   g.setTransform(k, 0, 0, k, 0, 0);
