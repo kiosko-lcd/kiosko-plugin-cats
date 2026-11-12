@@ -162,3 +162,22 @@ test('words: the panel language through ctx.t, times through ctx.fmt', () => {
   assert.equal(wordsIn('en').elapsed(65 * MIN), '1 h 05');
   assert.equal(wordsIn('es').inTime(wordsIn('es').countdown(4 * MIN + 1_000)), 'en 5 min');
 });
+
+test('shelf: the cabinet paints books only when there is a shelf, and the scene stays the same size', () => {
+  const sessions = [rec('api', 'active', 10 * MIN)];
+  const shelf = { week: 45, books: [{ repo: '/r/a', mr: false }, { repo: '/r/b', mr: true }, { repo: '/r/a', mr: false }], weeks: [{ commits: 2, mrs: 0 }, { commits: 2, mrs: 1 }] };
+  const without = renderScene(input(sessions));
+  const withShelf = renderScene(input(sessions, { shelf }));
+  assert.equal(withShelf.width, without.width);
+  assert.equal(withShelf.height, without.height);
+  assert.notDeepEqual(withShelf.toBuffer('image/png'), without.toBuffer('image/png'));
+  assert.deepEqual(renderScene(input(sessions, { shelf: null })).toBuffer('image/png'), without.toBuffer('image/png'));
+});
+
+test('trophies: the cabinet shows the built sets even without a shelf, and nothing without either', () => {
+  const sessions = [rec('api', 'active', 10 * MIN)];
+  const none = renderScene(input(sessions)).toBuffer('image/png');
+  const trophies = renderScene(input(sessions, { trophies: ['taj', 'halcon'] })).toBuffer('image/png');
+  assert.notDeepEqual(trophies, none);
+  assert.deepEqual(renderScene(input(sessions, { trophies: [] })).toBuffer('image/png'), none);
+});

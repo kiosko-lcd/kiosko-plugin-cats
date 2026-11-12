@@ -12,15 +12,21 @@
  * canvas; the width in design units follows the canvas aspect.
  */
 import type { Canvas } from '@kiosko/sdk';
-import type { SunTimes, Weather } from '@loksly/weather-astro';
+import { moonPhase, type SunTimes, type Weather } from '@loksly/weather-astro';
 import { createCanvas } from './canvas.ts';
-import { COATS, EXTENT, type Pose, backCat, boxGhost, boxSleeper, collarFor, frontCat, hiss, knead, pairHeart, schrodinger, sleepCat } from './cat.ts';
+import { COATS, EXTENT, type Pose, backCat, boxGhost, boxSleeper, collarFor, frontCat, hiss, knead, laptop, pairHeart, schrodinger, sleepCat } from './cat.ts';
+import { drawCabinet, SHELF_W } from './cabinet.ts';
+import { DURATION, LONG_MEETING_MS, WINDY_KMH, branchOf, ease, isRain, isSnow, isStorm, poseAt, redraws, releaseTag, repoBirthday, sshHost, type Gesture, type Placement, type Surroundings } from './anim.ts';
+import { drawBuildBehind, drawBuildFront, planBuild } from './lego.ts';
+import { propTextsFor, usePropTexts } from './prop-texts.ts';
 import { COND, MONO, MONO_BOLD } from './fonts.ts';
 import { type Actor, DESIGN_H, MARGIN, RIGHT_ZONE, type ColumnSide, type LayoutConfig, type SceneLayout, SILL, floorAt, heightOf, layoutScene, placeTags, tagText } from './layout.ts';
 import { ABANDONED_MS, nightOwl, partyTime, spookyDay } from './moments.ts';
-import { type X, ellipse, hashString, linear, radial } from './paint.ts';
-import { cobweb, deskDuck, devilHorns, meetingDoor, partyHat, tie } from './props.ts';
-import { type RoomName, type Sky, WINDOW, clockPos, daylight, lampX, paintRoom, resolveRoom, skyKey, spaceHelmet, wallClock } from './room.ts';
+import { type X, ellipse, hashString, linear, radial, rng } from './paint.ts';
+import { type Beat, drawDuel, duration, runningCat, shortDuel } from './duel.ts';
+import { type Spot, birthdayCake, blueprint, boxPile, boxWall, branchHat, butterfly, cards, catBook, catapult, cherryPick, chemistry, cobweb, cocoa, coffee, confetti, crane, crown, deployDrone, delivery, deskDuck, devilHorns, droneShow, droneSwarm, fallingBox, fallingLeaves, fish, hardHat, highFive, juggling, kittens, labGoggles, lampGrip, legoMerge, legoTower, lgtmStamp, magnifier, meetingDoor, mugPush, paperPress, papers, partyHat, pilotDrone, piggy, pointAtYou, popcorn, portal, postIts, remoteDesk, royalty, rubberDuck, sageGlasses, slipper, spaghetti, speedLines, steamroller, strawHat, tangle, tie, typing, wand, weekendBreak, windPapers, windowDrops, wizardHat, woolHat, yarn } from './props.ts';
+import { type RoomName, type Sky, WINDOW, beachWave, clockPos, daylight, lampX, paintRoom, penguinCrossing, resolveRoom, skyKey, spaceHelmet, squirrelRun, tumbleweed, wallClock } from './room.ts';
+import type { ShelfView } from './shelf.ts';
 import type { SessionView } from './types.ts';
 import type { Words } from './words.ts';
 
@@ -60,10 +66,34 @@ export interface SceneInput {
   sun?: SunTimes | null;
   /** Nobody in front of the panel: the cats that wait for you doze. */
   away?: boolean;
+  /** The week's commits and merged MRs, as books on the cabinet; without it, no cabinet. */
+  shelf?: ShelfView | null;
+  /** The gesture being painted: which cat, which one, and how far along (a frame of an animation, see anim.ts). */
+  anim?: Gesture | null;
+  /** The walk to the new spots: where each cat was and how far along (0..1). */
+  move?: { from: Record<string, Placement>; t: number } | null;
+  /** The LEGO sets built this week, in order, for the cabinet (see trophies.ts). */
+  trophies?: string[];
+  /** What goes on around the cats that the room can't tell by itself (quota, RAM, network). */
+  extra?: Pick<Surroundings, 'usageHigh' | 'offline' | 'memLevel'>;
+  /** The usage of the busiest window, 0..1 (the piggy bank gesture). */
+  usagePct?: number;
 }
 
 /** Design width of the card column, when one is kept free. */
 export const COLUMN_W = RIGHT_ZONE;
+
+/** Id of the last LEGO set the assembling cat built, for the tests. */
+let lastBuilt = '';
+export const lastBuiltSet = () => lastBuilt;
+
+/** Height of the lab goggles, from the top of the head. */
+const GOGGLES_Y = 95;
+const TAU_R = Math.PI * 2;
+const sc0 = (s: number) => Math.max(s, 0.5);
+
+/** Is the pose at rest? Then the cat of the static cache will do. */
+const atRest = (p: Pose | undefined) => !p || !(p.lid || p.swing || p.yawn || p.ear);
 
 /** Where the desk duck sits, relative to the cat at the laptop. */
 const DUCK_AT = { x: 178, y: -80, s: 0.6 };
@@ -102,13 +132,17 @@ interface Sprite {
   oy: number;
 }
 
+const SHORT_DUEL: Beat[] = shortDuel();
+
 const sprites = new Lru<Sprite>(32);
+// The poses and variants of the gestures have their own cache: they must not push out the still cats.
+const gestureSprites = new Lru<Sprite>(24);
 const rooms = new Lru<Canvas>(4);
 const vignettes = new Lru<Canvas>(4);
 
 /** For tests and diagnostics: cats and rooms painted from scratch. */
-export function cacheStats(): { sprites: number; rooms: number; paints: number; roomPaints: number } {
-  return { sprites: sprites.size, rooms: rooms.size, paints: sprites.misses, roomPaints: rooms.misses };
+export function cacheStats(): { sprites: number; rooms: number; paints: number; roomPaints: number; gesturePaints: number } {
+  return { sprites: sprites.size, rooms: rooms.size, paints: sprites.misses, roomPaints: rooms.misses, gesturePaints: gestureSprites.misses };
 }
 
 function vignette(w: number, h: number): Canvas {
@@ -188,11 +222,12 @@ const blurFor = (a: Actor) => (a.sill ? 0 : a.z < 0.6 ? 0 : Math.round((a.z - 0.
 const coat = (name: string) => COATS[name] ?? COATS.canela!;
 
 /**
- * Paints one pose. `flavor` is what changes with the hour or the day and lasts
- * hours (wide pupils after midnight, the Halloween ghost): it goes into the
- * cache key.
+ * Paints one pose. `variant`: drawings of a gesture (the cat without its
+ * laptop, the laptop without its cat, the ghost half out). `flavor`: what
+ * changes with the hour or the day and lasts hours (wide pupils after
+ * midnight, the Halloween ghost); that one goes in the static cache.
  */
-function paintPose(c: X, a: Actor, pose: Pose, flavor: string, words: Words): void {
+function paintPose(c: X, a: Actor, pose: Pose, flavor: string, words: Words, variant = ''): void {
   const [r0, r1] = a.records;
   const c0 = coat(a.coats[0]!);
   const c1 = coat(a.coats[1] ?? a.coats[0]!);
@@ -200,12 +235,18 @@ function paintPose(c: X, a: Actor, pose: Pose, flavor: string, words: Words): vo
   switch (a.pose) {
     case 'cartel': frontCat(c, c0, { mood: 'wide', collar: collarFor(r0!.provider), pose, dilate: flavor.includes('n') }); break;
     case 'sentado': frontCat(c, c0, { mood: 'open', collar: collarFor(r0!.provider), pose, dilate: flavor.includes('n') }); break;
-    case 'portatil': backCat(c, c0, seedOf(r0!), { pose, laptop: true }); break;
+    case 'portatil':
+      if (variant === 'soloPortatil') laptop(c, 165);
+      else backCat(c, c0, seedOf(r0!), { pose, laptop: variant !== 'sinPortatil' });
+      break;
     case 'dormido': sleepCat(c, c0, seedOf(r0!)); break;
-    case 'caja':
-      if (flavor.includes('f')) boxGhost(c, box, 0, 0, words.fragile);
+    case 'caja': {
+      const buu = /^buu:(-?[\d.]+):(-?[\d.]+)$/.exec(variant);
+      if (buu) boxGhost(c, box, Number(buu[1]), Number(buu[2]), words.fragile);
+      else if (flavor.includes('f')) boxGhost(c, box, 0, 0, words.fragile);
       else boxSleeper(c, c0, seedOf(r0!), box, words.fragile);
       break;
+    }
     case 'schrodinger': schrodinger(c, `bold 64px ${MONO_BOLD}`, pose.lid ?? 0); break;
     case 'corazon': pairHeart(c, c0, c1); break;
     case 'amasa': knead(c, c0, c1, collarFor(r1!.provider), pose); break;
@@ -214,12 +255,13 @@ function paintPose(c: X, a: Actor, pose: Pose, flavor: string, words: Words): vo
 }
 
 /** The cat already painted at its scale and with its haze, ready to compose. */
-function sprite(a: Actor, k: number, pose: Pose, light: Light, flavor: string, words: Words): Sprite {
+function sprite(a: Actor, k: number, pose: Pose | undefined, light: Light, flavor: string, words: Words, variant = ''): Sprite {
   const fog = a.sill ? 0.2 : Math.round(a.z * 20) / 20 * 0.38;
   const s = a.scale * k;
   const blur = blurFor(a);
-  const key = [a.pose, a.coats.join(','), a.records.map((r) => `${r.provider}:${seedOf(r)}`).join(','), s.toFixed(3), fog.toFixed(3), `${light.level}${light.side}`, blur, flavor, words.fragile, JSON.stringify(pose)].join('|');
-  return sprites.get(key, () => {
+  const rest = atRest(pose);
+  const key = [a.pose, a.coats.join(','), a.records.map((r) => `${r.provider}:${seedOf(r)}`).join(','), s.toFixed(3), fog.toFixed(3), `${light.level}${light.side}`, blur, variant, flavor, words.fragile, rest ? '' : JSON.stringify(pose)].join('|');
+  return (rest && !variant ? sprites : gestureSprites).get(key, () => {
     const [L, R] = EXTENT[a.pose]!;
     const w = Math.ceil((R - L + PAD * 2) * s), h = Math.ceil((TOP + BOTTOM) * s);
     const canvas = createCanvas(Math.max(1, w), Math.max(1, h));
@@ -227,7 +269,7 @@ function sprite(a: Actor, k: number, pose: Pose, light: Light, flavor: string, w
     const ox = (PAD - L) * s, oy = TOP * s;
     o.translate(ox, oy);
     o.scale(s, s);
-    paintPose(o, a, pose, flavor, words);
+    paintPose(o, a, rest ? {} : pose!, flavor, words, variant);
     grade(o, w, h, light);
     if (fog > 0) {
       // Aerial perspective: what is far melts into the room.
@@ -237,6 +279,25 @@ function sprite(a: Actor, k: number, pose: Pose, light: Light, flavor: string, w
       o.fillRect(0, 0, w, h);
     }
     return { canvas: flatten(canvas, blur), ox, oy };
+  });
+}
+
+/** The cat of the mad dash, at the scale of its spot: two drawings (stretched and gathered). */
+function runnerSprite(a: Actor, k: number, scale: number, stretch: number, light: Light): Sprite {
+  const s = Math.round(scale * 20) / 20 * k;
+  const r0 = a.records[0]!;
+  const key = ['carrera', a.coats[0], seedOf(r0), r0.provider, s.toFixed(3), stretch, `${light.level}${light.side}`].join('|');
+  return gestureSprites.get(key, () => {
+    const L = -300, R = 230;
+    const w = Math.ceil((R - L + PAD * 2) * s), h = Math.ceil((TOP + BOTTOM) * s);
+    const canvas = createCanvas(Math.max(1, w), Math.max(1, h));
+    const o = canvas.getContext('2d');
+    const ox = (PAD - L) * s, oy = TOP * s;
+    o.translate(ox, oy);
+    o.scale(s, s);
+    runningCat(o, coat(a.coats[0]!), seedOf(r0), collarFor(r0.provider), stretch);
+    grade(o, w, h, light);
+    return { canvas: flatten(canvas), ox, oy };
   });
 }
 
@@ -397,6 +458,15 @@ function heads(a: Actor): { dx: number; top: number; chest?: number }[] {
   }
 }
 
+/** The paw that points at nothing in particular (the detached HEAD cat). */
+function pointAtYouless(c: X, x: number, y: number, s: number): void {
+  c.save();
+  c.fillStyle = '#F3E3CF';
+  ellipse(c, x + 60 * s, y, 22 * s, 18 * s, -0.4);
+  c.fill();
+  c.restore();
+}
+
 const HAT_COLORS = ['#FF5C8A', '#4DA3FF', '#FFD34D', '#39D98A', '#C58BFF'];
 
 type TagSpot = { name: string; time: string; size: number; y: number; x: number; w: number; h: number };
@@ -458,6 +528,25 @@ export function roomView(width: number, height: number): RoomView {
   return { k, W, RW, x0 };
 }
 
+/** What goes on around the cats and decides some gestures (see anim.ts). */
+export function surroundings(input: Pick<SceneInput, 'sessions' | 'now' | 'weather' | 'sun' | 'away' | 'options' | 'extra'>): Surroundings {
+  const now = input.now;
+  const code = input.weather?.code ?? 0;
+  const d = new Date(now);
+  return {
+    ...input.extra,
+    meetingSoon: input.sessions.some((r) => r.startsAt !== undefined && r.startsAt - now <= MEETING_SOON_MS),
+    rain: isRain(code),
+    storm: isStorm(code),
+    snow: isSnow(code),
+    windy: (input.weather?.wind ?? 0) >= WINDY_KMH,
+    fullMoon: moonPhase(now).illumination >= 0.97 && lightLevel(skyOf(now, input.weather, input.sun)) === 0,
+    room: resolveRoom(input.options.room, now, input.options.rooms),
+    ...(input.away !== undefined ? { away: input.away } : {}),
+    longMeeting: input.sessions.some((r) => r.startsAt !== undefined && r.endsAt !== undefined && r.startsAt <= now && now < r.endsAt && r.endsAt - r.startsAt >= LONG_MEETING_MS),
+  };
+}
+
 /** The cast of the scene, without painting (tests, the duel). */
 export function sceneLayout(input: Pick<SceneInput, 'sessions' | 'now' | 'width' | 'height' | 'options'>): SceneLayout {
   const v = roomView(input.width, input.height);
@@ -500,6 +589,8 @@ export function drawRoom(ctx: X, v: RoomView, height: number, sky: Sky, room: Ro
 // ---------- Frame ----------
 export function renderScene(input: SceneInput): Canvas {
   const { width, height, now, words, options } = input;
+  // The little texts painted by the props speak the panel's language.
+  usePropTexts(propTextsFor(words.lang));
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = BG;
@@ -530,6 +621,8 @@ export function renderScene(input: SceneInput): Canvas {
     text(ctx, `${Math.round(weather.temp)}°`, 828, 64, `bold 17px ${MONO_BOLD}`, '#FFD08A', 'center');
   }
   const L = layoutScene(input.sessions, now, layoutConfig(options), v.W, columnWidth(options), v.x0);
+  // The cabinet stands behind everyone, far from the clock, and moves aside if the strip reaches it.
+  drawCabinet(ctx, Math.min(RW - RIGHT_ZONE - SHELF_W - 230, L.zone.hi - SHELF_W - 30), floorAt(1), input.shelf ?? null, lightLevel(sky) === 0, words.week, input.trophies ?? []);
   const party = partyTime(now);
   const spooky = spookyDay(now);
   const flavor = `${nightOwl(now) ? 'n' : ''}${spooky ? 'f' : ''}`;
@@ -540,46 +633,329 @@ export function renderScene(input: SceneInput): Canvas {
     meetingDoor(ctx, DOOR_X, 110, 272, words.meeting, left <= 0 ? words.now : words.inTime(words.countdown(left)));
   }
 
-  // Tags are placed before painting anything, nearest first, so they don't overlap (see placeTags).
+  const around = surroundings(input);
+  // RAM llena: cajas contra la pared del fondo, detrás de todos.
+  const mem = around.memLevel ?? 0;
+  if (mem > 0) boxPile(ctx, L.zone.lo + MARGIN + 330, L.zone.hi - 60, floorAt(0.97), mem);
+  // Con la RAM al límite, el gato más cercano queda emparedado.
+  const walled = mem >= 3 ? [...L.actors].filter((x) => x.pose !== 'cartel' && !x.sill).sort((p, q) => q.scale - p.scale)[0] : undefined;
+  // Dónde queda cada sesión (su cabeza, si es una pareja), para los gestos entre dos.
+  const spots = new Map<string, Spot & { a: Actor; i: number }>();
+
+  // Placas: se reparten antes de pintar nada, de la más cercana a la más
+  // lejana, para que no se pisen (ver placeTags).
   const tagInfo = computeTags(ctx, L, now, words);
+
+  // Gatos, de atrás adelante, con su placa en el suelo y sus textos encima.
+  const anim = input.anim ?? null;
+  // Fuera de 0 < t < 1 el gesto está en reposo: nada cambia respecto al estático.
+  const live = anim && anim.t > 0 && anim.t < 1 ? anim : null;
   const level = lightLevel(sky);
   const lx = lightX(level, RW);
-
-  // Cats, back to front, with their tag on the floor and their texts on top.
+  // Paseo en curso: cada gato que ya estaba va de donde estaba a donde toca.
+  const mv = input.move && input.move.t > 0 && input.move.t < 1 ? input.move : null;
+  // Durante un duelo la habitación se apaga un poco: la luz la ponen las espadas.
+  let duelFlash = 0;
+  if (live?.kind === 'duelo') {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = `rgba(8,10,20,${0.32 * Math.min(1, Math.sin(Math.PI * live.t) * 3)})`;
+    ctx.fillRect(0, 0, width, height);
+    toDesign();
+  }
+  // Reunión larga: todos al centro, en corro alrededor de un plano, y vuelta.
+  const corroF = live?.kind === 'corro' ? (live.t < 0.15 ? ease(live.t / 0.15) : live.t > 0.85 ? 1 - ease((live.t - 0.85) / 0.15) : 1) : 0;
+  const floorActors = L.actors.filter((x) => !x.sill);
+  const corroC = { x: (L.zone.lo + MARGIN + L.zone.hi) / 2, y: floorAt(0.3) };
+  const corroAt = (a: Actor) => {
+    const i = floorActors.indexOf(a), n = Math.max(1, floorActors.length);
+    const ang = Math.PI / 2 + (i / n) * TAU_R + 0.3;
+    return { x: corroC.x + Math.cos(ang) * 300, y: corroC.y - 30 + Math.sin(ang) * 40 };
+  };
+  if (live?.kind === 'ola') beachWave(ctx, RW, live.t);
+  if (live?.kind === 'pinguino') penguinCrossing(ctx, RW, live.t);
+  if (live?.kind === 'rodadora') tumbleweed(ctx, RW, live.t);
+  if (live?.kind === 'ardilla') squirrelRun(ctx, RW, live.t);
+  if (corroF > 0) blueprint(ctx, corroC.x, corroC.y - 20, corroF);
   for (const a of L.actors) {
-    const vs = a.scale, vx = a.x;
-    // In space they float: each at its own height and a little tilted.
+    const g = live && live.id === a.records[0]!.session_id ? live : null;
+    const from = mv?.from[a.records[0]!.session_id];
+    const e = mv ? ease(mv.t) : 1;
+    const vs = from ? from.scale + (a.scale - from.scale) * e : a.scale;
+    // Pasitos: si cambia de profundidad, bota un poco al andar.
+    const hop = from && mv && Math.abs(from.z - a.z) >= 0.05 ? Math.abs(Math.sin(Math.PI * mv.t * 4)) * 10 * vs : 0;
+    // Con reunión encima, el que se arregla la corbata se acerca a la puerta y vuelve.
+    const toDoor = g?.kind === 'corbata' ? Math.sin(Math.PI * g.t) * (DOOR_X - a.x) * 0.75 : 0;
+    // Sobredosis de café: un desfase de 2 px a izquierda y derecha, frame a frame.
+    const jitter = g?.kind === 'temblor' ? (Math.round(g.t * DURATION.temblor * 6) % 2 ? 2 : -2) / k : 0;
+    const vx = (from ? from.x + (a.x - from.x) * e : a.x) + toDoor + jitter + (corroF > 0 && !a.sill ? (corroAt(a).x - a.x) * corroF : 0);
+    // Trueno: todos dan un saltito a la vez.
+    const jump = live?.kind === 'trueno' ? Math.sin(Math.PI * Math.max(0, Math.min(1, (live.t - 0.1) / 0.6))) * 26 * vs
+      // Y el que pisa una pieza de Lego en un merge con conflicto.
+      : g?.kind === 'encaje' && a.records[0]!.lastFailed && g.t > 0.62 && g.t < 0.92 ? Math.sin(Math.PI * (g.t - 0.62) / 0.3) * 40 * vs : 0;
+    const vy0 = from ? from.floorY + (a.floorY - from.floorY) * e - hop : a.floorY;
+    // En el espacio flotan: cada uno a su altura y un poco ladeado, y en la
+    // ingravidez suben y bajan todos a la vez.
     const seedA = seedOf(a.records[0]!);
-    const lift = inSpace && !a.sill ? (40 + (seedA % 60)) * vs : 0;
-    const tilt = inSpace && !a.sill ? ((seedA >> 3) % 11 - 5) * 0.012 : 0;
-    const vy = a.floorY - lift;
+    const drift = live?.kind === 'ingravidez' ? Math.sin(TAU_R * live.t) : 0;
+    const lift = inSpace && !a.sill ? (40 + (seedA % 60) + drift * 18) * vs : 0;
+    const tilt = inSpace && !a.sill ? ((seedA >> 3) % 11 - 5) * 0.012 + drift * 0.04 : 0;
+    const vy = vy0 - jump - lift + (corroF > 0 && !a.sill ? (corroAt(a).y - a.floorY) * corroF : 0);
     const side: Light['side'] = lx >= a.x ? 1 : -1;
-    // Shadow on the floor, stretched away from the light.
+    // Sombra en el suelo, alargada hacia el lado contrario de la luz.
     if (!a.sill && !inSpace) {
       toDesign();
       ctx.save();
-      ctx.translate(vx - side * 60 * vs, vy + 3);
+      ctx.translate(vx - side * 60 * vs, vy + hop + 3);
       ctx.scale(1, 0.12);
       ctx.fillStyle = radial(ctx, 0, 0, 0, 160 * vs, [[0, `rgba(0,0,0,${level === 0 ? 0.3 : 0.2})`], [1, 'rgba(0,0,0,0)']]);
       ellipse(ctx, 0, 0, 170 * vs, 170 * vs);
       ctx.fill();
       ctx.restore();
     }
+    if (g?.kind === 'duelo' && a.pose === 'bufido') {
+      // Los dos que se pisan, de perfil y a espada; la placa sigue debajo.
+      toDesign();
+      const [r0, r1] = a.records;
+      duelFlash = drawDuel(ctx, SHORT_DUEL, g.t * duration(SHORT_DUEL), vx, vy, vs * 0.62, {
+        coats: [coat(a.coats[0]!), coat(a.coats[1] ?? a.coats[0]!)], collars: [collarFor(r0!.provider), collarFor(r1!.provider)],
+      }, seedOf(r0!));
+      const t = tagInfo.get(a)!;
+      tag(ctx, t.x, t.y, t.name, t.time, toneColor(a), t.size, 1, t.w);
+      continue;
+    }
+    if (g?.kind === 'montaje' && a.pose === 'sentado') {
+      // Saca la caja y monta el set mirando el manual, de frente y sin dejar
+      // de preguntar «¿sigo?»: sigue ocioso y tiene que verse. Ver lego.ts.
+      toDesign();
+      // El suelo libre a cada lado llega hasta el primer gato que está tan
+      // cerca o más que él: ésos taparían la maqueta. Los del fondo no.
+      let lo = L.zone.lo + MARGIN, hi = L.zone.hi;
+      for (const o of L.actors) {
+        if (o === a || o.sill || o.z > a.z + 0.02) continue;
+        const [l, r] = EXTENT[o.pose]!;
+        if (o.x < vx) lo = Math.max(lo, o.x + r * o.scale);
+        else hi = Math.min(hi, o.x + l * o.scale);
+      }
+      // Un set distinto en cada montaje: la escena de un gesto tiene su `now`
+      // fijo, así que el minuto vale de semilla y los frames salen iguales.
+      const pickSeed = Math.imul(seedOf(a.records[0]!) ^ Math.floor(now / 60_000), 2654435761) >>> 8;
+      const plan = { ...planBuild(vx, vy, vs, pickSeed, lo, hi), night: level === 0 };
+      lastBuilt = plan.set.id;
+      drawBuildBehind(ctx, plan, g.t);
+      const body = sprite(a, k, undefined, { level, side }, flavor, words);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(body.canvas, Math.round(px(vx) - body.ox), Math.round(vy * k - body.oy));
+      toDesign();
+      const t = tagInfo.get(a)!;
+      tag(ctx, t.x, t.y, t.name, t.time, toneColor(a), t.size, 1 - a.z * 0.25, t.w);
+      drawBuildFront(ctx, plan, g.t);
+      const top = vy - (heightOf(a) / a.scale) * vs;
+      bubble(ctx, vx + 70 * vs, top - 40 * vs, words.goOn, Math.round(26 * vs + 6));
+      continue;
+    }
+    if (g?.kind === 'carrera' && a.pose === 'portatil') {
+      // La carrera loca: el portátil se queda solo y el gato cruza la
+      // habitación en tres frames, de punta a punta, y vuelve como si nada.
+      const desk = sprite(a, k, undefined, { level, side }, '', words, 'soloPortatil');
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(desk.canvas, Math.round(px(vx) - desk.ox), Math.round(vy * k - desk.oy));
+      toDesign();
+      const u = Math.max(0, Math.min(1, (g.t - 0.25) / 0.5));
+      const left = L.zone.lo + MARGIN + 160 * vs, right = L.zone.hi - 200 * vs;
+      const rx = left + (right - left) * u;
+      const stretch = Math.round(u * 2) % 2 === 0 ? 1 : 0;
+      const run = runnerSprite(a, k, vs, stretch, { level, side });
+      speedLines(ctx, rx, vy, vs, 1, 11 + Math.round(u * 4));
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      // Estela: dos copias tenues detrás, como una foto movida.
+      for (const [dx, alpha] of [[-150, 0.18], [-80, 0.35], [0, 1]] as const) {
+        ctx.globalAlpha = alpha;
+        ctx.drawImage(run.canvas, Math.round(px((rx + dx * vs)) - run.ox), Math.round(vy * k - run.oy));
+      }
+      ctx.globalAlpha = 1;
+      toDesign();
+      const t = tagInfo.get(a)!;
+      tag(ctx, t.x, t.y, t.name, t.time, toneColor(a), t.size, 1 - a.z * 0.25, t.w);
+      continue;
+    }
     const lead = a.records[0]!;
     const abandoned = a.pose === 'portatil' && lead.lastCommit !== undefined && now - lead.lastCommit >= ABANDONED_MS;
-    // With nobody in front, the ones waiting for you doze with their eyes
-    // closed, without changing pose: they still say they wait.
+    if (g && a.pose === 'portatil' && (['voltereta', 'lupa', 'lgtm', 'cabeza', 'sacude', 'rebusca', 'portal', 'viento'] as string[]).includes(g.kind)) {
+      // Gestos que mueven al gato entero: se pinta el portátil solo y el gato
+      // aparte (sin portátil), girado, desplazado o partido por el cuello.
+      const light = { level, side };
+      const desk = sprite(a, k, undefined, light, '', words, 'soloPortatil');
+      const body = sprite(a, k, undefined, light, '', words, 'sinPortatil');
+      const py = (y: number) => y * k;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      const put = (sp: typeof body, x: number, y: number) => ctx.drawImage(sp.canvas, Math.round(px(x) - sp.ox), Math.round(py(y) - sp.oy));
+      const u = g.t;
+      const sc = vs;
+      let hatAt: { x: number; y: number } | null = null;
+      if (g.kind === 'voltereta') {
+        // Salto mortal hacia atrás: sube, gira 360° y cae sentado.
+        put(desk, vx, vy);
+        const f = Math.max(0, Math.min(1, (u - 0.1) / 0.55));
+        const cy = vy - 150 * sc - Math.sin(Math.PI * f) * 140 * sc;
+        ctx.save();
+        ctx.translate(px(vx), py(cy));
+        ctx.rotate(-TAU_R * ease(f));
+        ctx.drawImage(body.canvas, Math.round(-body.ox), Math.round(-body.oy + 150 * sc * k));
+        ctx.restore();
+        if (u >= 0.65) hatAt = { x: vx, y: vy - 258 * sc };
+      } else if (g.kind === 'lupa') {
+        put(desk, vx, vy);
+        if (u > 0.42 && u < 0.86) {
+          // Se gira hacia ti: el mismo gato, de frente, y te señala.
+          const front = sprite({ ...a, pose: 'sentado' }, k, undefined, light, flavor, words);
+          put(front, vx, vy);
+          toDesign();
+          pointAtYou(ctx, vx + 40 * sc, vy - 120 * sc, Math.max(sc, 0.55), Math.sin(Math.PI * (u - 0.42) / 0.44));
+        } else {
+          put(body, vx, vy);
+          toDesign();
+          const sweep = Math.sin(u * TAU_R * 1.2);
+          magnifier(ctx, vx + sweep * 90 * sc, vy - 200 * sc, Math.max(sc, 0.55));
+        }
+      } else if (g.kind === 'lgtm') {
+        put(desk, vx, vy);
+        // Sale disparado hacia la lámpara, se queda colgado y vuelve.
+        const lx = lampX(RW), ly = 64;
+        const hang = { x: lx, y: ly + 250 * sc };
+        const f = u < 0.32 ? 0 : u < 0.42 ? (u - 0.32) / 0.1 : u < 0.78 ? 1 : u < 0.9 ? 1 - (u - 0.78) / 0.12 : 0;
+        const bx = vx + (hang.x - vx) * f, by = vy + (hang.y - vy) * f - Math.sin(Math.PI * f) * 40 * sc;
+        put(body, bx, by);
+        toDesign();
+        if (u >= 0.42 && u < 0.78) lampGrip(ctx, lx, ly, sc);
+        lgtmStamp(ctx, { x: vx, y: vy, s: Math.max(sc, 0.55) }, u);
+      } else if (g.kind === 'cabeza') {
+        // HEAD separado: la cabeza flota sobre el cuello; la recoloca y suspira.
+        put(desk, vx, vy);
+        const lift = (u < 0.45 ? ease(u / 0.45) : u < 0.7 ? 1 - ease((u - 0.45) / 0.25) : 0) * 70 * sc * k + (u < 0.45 ? Math.sin(u * 30) * 2 : 0);
+        const neck = Math.round(body.oy - 128 * sc * k);
+        const bx0 = Math.round(px(vx) - body.ox), by0 = Math.round(py(vy) - body.oy);
+        const w = body.canvas.width, h = body.canvas.height;
+        ctx.drawImage(body.canvas, 0, neck, w, h - neck, bx0, by0 + neck, w, h - neck);
+        ctx.drawImage(body.canvas, 0, 0, w, neck, bx0, Math.round(by0 - lift), w, neck);
+        toDesign();
+        if (u < 0.45) outlined(ctx, words.detachedHead, vx, vy - 330 * sc, Math.round(18 * sc + 8), '#FFD08A');
+        if (u >= 0.45 && u < 0.72) pointAtYouless(ctx, vx, vy - 290 * sc - lift / k, sc);
+        if (u >= 0.7) outlined(ctx, words.relief, vx + 120 * sc, vy - 300 * sc, Math.round(22 * sc + 8), '#E6EDF5');
+      } else if (g.kind === 'viento') {
+        // La corriente saca los folios por la habitación y el gato corre tras ellos.
+        put(desk, vx, vy);
+        const right = L.zone.hi - 160 * sc;
+        toDesign();
+        windPapers(ctx, WINDOW.x + WINDOW.w, WINDOW.y + WINDOW.h * 0.5, right + 80, vy - 20, u);
+        if (u > 0.25 && u < 0.85) {
+          const f = (u - 0.25) / 0.6;
+          const rx = vx + (right - vx) * Math.sin(Math.PI * f);
+          const run = runnerSprite(a, k, vs, Math.round(f * 8) % 2, light);
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          if (f > 0.5) {
+            // A la vuelta, mirando hacia la izquierda.
+            ctx.save();
+            ctx.translate(Math.round(px(rx)), Math.round(py(vy)));
+            ctx.scale(-1, 1);
+            ctx.drawImage(run.canvas, -run.ox, -run.oy);
+            ctx.restore();
+          } else {
+            put(run, rx, vy);
+          }
+        } else {
+          put(body, vx, vy);
+        }
+      } else if (g.kind === 'rebusca') {
+        // Mete la cabeza en la pantalla: se ve el cuerpo, echado hacia
+        // delante, y los papeles que salen volando del portátil.
+        put(desk, vx, vy);
+        const lean = Math.sin(Math.PI * u) * 14 * sc * k;
+        const neck = Math.round(body.oy - 128 * sc * k);
+        const bx0 = Math.round(px(vx) - body.ox), by0 = Math.round(py(vy) - body.oy);
+        const w = body.canvas.width, h = body.canvas.height;
+        if (u > 0.15 && u < 0.85) ctx.drawImage(body.canvas, 0, neck, w, h - neck, bx0, Math.round(by0 + neck - lean), w, h - neck);
+        else put(body, vx, vy);
+        toDesign();
+        const ps = Math.max(sc, 0.55);
+        for (const [dx, dt] of [[-60, 0], [40, 0.15], [110, 0.3]] as const) papers(ctx, vx + dx * ps, vy - 150 * ps, ps, Math.max(0, Math.min(1, u * 1.2 - dt)));
+        if (u > 0.2 && u < 0.8) outlined(ctx, words.whereWas, vx, vy - 320 * sc, Math.round(18 * sc + 8), '#FFFFFF');
+      } else if (g.kind === 'portal') {
+        // ssh: entra por un portal, trabaja en el escritorio del fondo y vuelve.
+        put(desk, vx, vy);
+        const gx = vx - 210 * sc, gy = vy - 150 * sc;
+        const far = { x: L.zone.hi - 120, y: floorAt(0.97), s: 0.3 };
+        const open = u < 0.3 ? Math.min(1, u / 0.12) : u > 0.75 ? Math.min(1, (1 - u) / 0.12) : u < 0.4 ? 1 - (u - 0.3) / 0.1 : u > 0.65 ? (u - 0.65) / 0.1 : 0;
+        toDesign();
+        portal(ctx, gx, gy, sc, open);
+        remoteDesk(ctx, far.x, far.y, 0.9, sshHost(lead.detail ?? '') || words.server);
+        portal(ctx, far.x - 90, far.y - 60, far.s, u > 0.3 && u < 0.75 ? Math.min(1, Math.min(u - 0.3, 0.75 - u) / 0.08) : 0);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        const scaled = (x: number, y: number, r: number) => ctx.drawImage(body.canvas, Math.round(px(x) - body.ox * r), Math.round(py(y) - body.oy * r), Math.round(body.canvas.width * r), Math.round(body.canvas.height * r));
+        if (u < 0.3) {
+          const f = ease(Math.max(0, (u - 0.1) / 0.2));
+          scaled(vx + (gx - vx) * f, vy, 1 - f * 0.9);
+        } else if (u < 0.75) {
+          scaled(far.x, far.y + 10, far.s / sc);
+        } else {
+          const f = ease(Math.min(1, (u - 0.75) / 0.2));
+          scaled(gx + (vx - gx) * f, vy, 0.1 + f * 0.9);
+        }
+      } else {
+        // Rama abandonada: se sacude y caen hojitas.
+        put(desk, vx, vy);
+        const dx = Math.sin(u * 40) * 8 * sc * (1 - u);
+        put(body, vx + dx, vy);
+        toDesign();
+        cobweb(ctx, vx + dx, vy, sc);
+        fallingLeaves(ctx, vx, vy, sc, u);
+      }
+      toDesign();
+      if (hatAt) branchHat(ctx, hatAt.x, hatAt.y, sc, branchOf(lead.detail ?? ''));
+      const t = tagInfo.get(a)!;
+      tag(ctx, t.x, t.y, t.name, t.time, toneColor(a), t.size, 1 - a.z * 0.25, t.w);
+      a.records.forEach((r, i) => spots.set(r.session_id, { x: vx + (heads(a)[i]?.dx ?? 0) * sc, y: vy, s: sc, a, i }));
+      continue;
+    }
+    const buu = g?.kind === 'buu' && a.pose === 'caja' ? Math.sin(Math.PI * g.t) : 0;
+    const variant = buu ? `buu:${(Math.round(buu * 4) / 4).toFixed(2)}:${(Math.round(Math.sin(2 * Math.PI * g!.t) * 4) / 4).toFixed(2)}` : '';
+    // Luna llena: el del alféizar se incorpora, aúlla (sin sonido) y vuelve a dormir.
+    const howl = g?.kind === 'aullido' && g.t > 0.15 && g.t < 0.85;
+    const who = howl ? { ...a, pose: 'sentado' as const } : a;
+    const howlPose = howl ? { yawn: Math.round(Math.min(1, Math.sin(Math.PI * (g!.t - 0.15) / 0.7) * 1.5) * 4) / 4 } : undefined;
+    // En el corro, el portátil se queda en su sitio.
+    const away = corroF > 0 && a.pose === 'portatil';
+    if (away) {
+      const desk = sprite(a, k, undefined, { level, side }, '', words, 'soloPortatil');
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(desk.canvas, Math.round(px(a.x) - desk.ox), Math.round(a.floorY * k - desk.oy));
+    }
+    toDesign();
+    if (g?.kind === 'gotas') windowDrops(ctx, WINDOW, { x: vx, y: vy, s: sc0(vs) }, g.t);
+    // Sin nadie delante, los que te esperan dormitan con los ojos cerrados,
+    // sin cambiar de pose: siguen diciendo que esperan.
     const dozing = input.away === true && (a.pose === 'sentado' || a.pose === 'cartel');
-    const sp = sprite(a, k, dozing ? { lid: 1 } : {}, { level, side }, flavor, words);
+    const sp = sprite(who, k, howlPose ?? (dozing ? { lid: 1 } : g && redraws(g.kind) ? poseAt(g.kind, g.t) : undefined), { level, side }, howl ? '' : flavor, words, away ? 'sinPortatil' : variant);
+    // Lo que va detrás del gato: el contenedor de la grúa y el manto del rey.
+    toDesign();
+    if (g?.kind === 'contenedor') crane(ctx, { x: vx, y: vy, s: Math.max(vs, 0.55) }, g.t);
+    if (g?.kind === 'corona') royalty(ctx, vx, vy, vs);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    // Durante el paseo se reescala el gato de destino: pintar uno por tamaño
+    // sería repintar el pelo en cada frame.
+    const r = vs / a.scale;
+    // Respirar o estirarse con el café: el gato crece un poco desde el suelo.
+    const breath = g?.kind === 'respira' ? 0.035 * Math.sin(Math.PI * g.t) : g?.kind === 'cafe' ? 0.07 * Math.sin(Math.PI * g.t) : 0;
+    const w = sp.canvas.width * r, h = sp.canvas.height * r * (1 + breath);
     if (tilt) {
       ctx.save();
       ctx.translate(px(vx), vy * k);
       ctx.rotate(tilt);
-      ctx.drawImage(sp.canvas, -sp.ox, -sp.oy);
+      ctx.drawImage(sp.canvas, -sp.ox * r, -sp.oy * r * (1 + breath), w, h);
       ctx.restore();
-    } else {
+    } else if (r === 1 && !breath) {
       ctx.drawImage(sp.canvas, Math.round(px(vx) - sp.ox), Math.round(vy * k - sp.oy));
+    } else {
+      ctx.drawImage(sp.canvas, Math.round(px(vx) - sp.ox * r), Math.round(vy * k - sp.oy * r * (1 + breath)), Math.round(w), Math.round(h));
     }
     toDesign();
     const sc = vs;
@@ -587,14 +963,14 @@ export function renderScene(input: SceneInput): Canvas {
       ctx.save();
       ctx.translate(vx, vy);
       ctx.scale(sc, sc);
-      signBoard(ctx, lead, now, words);
+      signBoard(ctx, a.records[0]!, now, words);
       ctx.restore();
     } else {
       const t = tagInfo.get(a)!;
-      tag(ctx, t.x, t.y + (vy - a.floorY), t.name, t.time, toneColor(a), t.size, 1 - a.z * 0.25, t.w);
+      tag(ctx, t.x + (vx - a.x), t.y + (vy + hop - a.floorY), t.name, t.time, toneColor(a), t.size, 1 - a.z * 0.25, t.w);
     }
     if (inSpace) {
-      // Bubble helmet, turned with the cat.
+      // Casco de burbuja, girado con el gato.
       ctx.save();
       ctx.translate(vx, vy);
       ctx.rotate(tilt);
@@ -604,12 +980,21 @@ export function renderScene(input: SceneInput): Canvas {
       if (a.pose === 'caja') spaceHelmet(ctx, -80, -140, 56, false);
       ctx.restore();
     }
+    a.records.forEach((r, i) => spots.set(r.session_id, { x: vx + (heads(a)[i]?.dx ?? 0) * sc, y: vy, s: sc, a, i }));
+    if (a === walled) boxWall(ctx, vx, vy, sc);
     if (abandoned) cobweb(ctx, vx, vy, sc);
-    const top = vy - heightOf(a);
+    const top = vy - (heightOf(a) / a.scale) * vs;
     if (a.pose === 'sentado') bubble(ctx, vx + 70 * sc, top - 40 * sc, words.goOn, Math.round(26 * sc + 6));
-    if (a.pose === 'caja' && !spooky) {
-      outlined(ctx, 'Z', vx - 150 * sc, top - 20 * sc, Math.round(40 * sc), '#CFE0FF');
-      outlined(ctx, 'z', vx - 112 * sc, top + 12 * sc, Math.round(30 * sc), '#CFE0FF');
+    if (a.pose === 'caja' && spooky) {
+      if (buu > 0.3) outlined(ctx, words.boo, vx + 90 * sc, top - 40 * sc - buu * 40 * sc, Math.round(40 * sc + 6), '#E8F0FF');
+    } else if (a.pose === 'caja') {
+      // Las zetas suben y se desvanecen un poco durante el gesto.
+      const up = g?.kind === 'zetas' ? Math.sin(Math.PI * g.t) * 26 * sc : 0;
+      ctx.save();
+      ctx.globalAlpha = 1 - (up / (26 * sc || 1)) * 0.35;
+      outlined(ctx, 'Z', vx - 150 * sc, top - 20 * sc - up, Math.round(40 * sc), '#CFE0FF');
+      outlined(ctx, 'z', vx - 112 * sc - up * 0.3, top + 12 * sc - up * 1.4, Math.round(30 * sc), '#CFE0FF');
+      ctx.restore();
     }
     if (dozing) {
       for (const h of heads(a)) {
@@ -618,18 +1003,117 @@ export function renderScene(input: SceneInput): Canvas {
       }
     }
     if (a.pose === 'amasa') outlined(ctx, 'prrr', vx + 250 * sc, top - 10 * sc, Math.round(28 * sc + 4), '#FFFFFF');
-    // Ties with a meeting coming; party hats on Friday afternoon.
+    // Corbatas con reunión encima; gorritos el viernes por la tarde.
     for (const [i, h] of heads(a).entries()) {
-      if (meetingSoon && h.chest !== undefined) tie(ctx, vx + h.dx * sc, vy + h.chest * sc, sc);
+      if (around.meetingSoon && h.chest !== undefined) tie(ctx, vx + h.dx * sc, vy + h.chest * sc, sc);
       if (spooky) devilHorns(ctx, vx + h.dx * sc, vy + h.top * sc, sc);
-      else if (party) partyHat(ctx, vx + h.dx * sc, vy + h.top * sc, sc, HAT_COLORS[(i + lead.session_id.length) % HAT_COLORS.length]!, i % 2 ? 0.15 : -0.15);
+      else if (party) partyHat(ctx, vx + h.dx * sc, vy + h.top * sc, sc, HAT_COLORS[(i + a.records[0]!.session_id.length) % HAT_COLORS.length]!, i % 2 ? 0.15 : -0.15);
     }
-    // The rubber duck that stayed as a mascot, next to the laptop.
-    if (a.pose === 'portatil' && lead.duck) deskDuck(ctx, vx + DUCK_AT.x * sc, vy + DUCK_AT.y * sc, sc * DUCK_AT.s);
+    // El patito de goma que se quedó de mascota, junto al portátil.
+    if (a.pose === 'portatil' && a.records[0]!.duck && g?.kind !== 'patito') deskDuck(ctx, vx + DUCK_AT.x * sc, vy + DUCK_AT.y * sc, sc * DUCK_AT.s);
+    // Accesorios del gesto de la herramienta en curso, encima del gato.
+    if (g) {
+      // Los accesorios de al lado, con un tamaño mínimo: en un gato del fondo,
+      // a su escala, una taza o una hucha no se distinguirían.
+      const ps = Math.max(sc, 0.55);
+      if (g.kind === 'cafe') coffee(ctx, vx, vy, ps, g.t);
+      if (g.kind === 'hucha') piggy(ctx, vx, vy, ps, g.t, (input.usagePct ?? 0) * 100);
+      if (g.kind === 'catapulta') catapult(ctx, vx, vy, ps, g.t);
+      if (g.kind === 'enredo') tangle(ctx, vx, vy, sc, g.t);
+      if (g.kind === 'teclea') typing(ctx, vx, vy, sc, g.t);
+      if (g.kind === 'ovillo') yarn(ctx, vx, vy, sc, g.t);
+      if (g.kind === 'peces') fish(ctx, vx, vy, sc, g.t);
+      if (g.kind === 'gatitos') kittens(ctx, coat(a.coats[0]!), vx, vy, sc, g.t);
+      if (g.kind === 'folios') papers(ctx, vx, vy, sc, g.t);
+      if (g.kind === 'cartas') cards(ctx, { x: vx, y: vy, s: ps }, g.t, lead.lastFailed === true);
+      if (g.kind === 'apisonadora') {
+        hardHat(ctx, vx, vy - 258 * sc, sc);
+        steamroller(ctx, { x: vx, y: vy, s: ps }, g.t);
+      }
+      if (g.kind === 'cereza') {
+        const other = L.actors.filter((o) => o !== a && o.pose === 'portatil').sort((p, q) => Math.abs(p.x - a.x) - Math.abs(q.x - a.x))[0];
+        cherryPick(ctx, { x: vx, y: vy, s: ps }, other ? { x: other.x, y: other.floorY - 200 * other.scale } : { x: vx - 90 * sc, y: vy - 230 * sc }, g.t);
+      }
+      if (g.kind === 'reparto') delivery(ctx, { x: vx, y: vy, s: ps }, g.t, L.zone.hi);
+      if (g.kind === 'chancla') slipper(ctx, { x: vx, y: vy, s: ps }, g.t, L.zone.hi);
+      if (g.kind === 'corona') crown(ctx, vx, vy - 258 * sc, sc);
+      if (g.kind === 'palomitas') popcorn(ctx, { x: vx, y: vy, s: ps }, g.t);
+      if (g.kind === 'chocolate') {
+        const h = heads(a)[0];
+        if (h) woolHat(ctx, vx + h.dx * sc, vy + h.top * sc, sc);
+        cocoa(ctx, { x: vx, y: vy, s: ps }, g.t);
+      }
+      if (g.kind === 'aullido' && howl) {
+        // Ondas de un aullido que no suena: punteadas y tenues.
+        ctx.save();
+        ctx.setLineDash([4, 6]);
+        ctx.strokeStyle = 'rgba(220,230,255,0.6)';
+        ctx.lineWidth = 2;
+        for (const r of [30, 50, 70]) {
+          ctx.beginPath();
+          ctx.arc(vx, vy - 200 * sc, r * Math.max(sc, 0.5) * 2, -Math.PI * 0.8, -Math.PI * 0.2);
+          ctx.stroke();
+        }
+        ctx.restore();
+        outlined(ctx, words.silent, vx + 90 * Math.max(sc, 0.5), vy - 320 * sc, 16, '#CFE0FF');
+      }
+      if (g.kind === 'libro') catBook(ctx, { x: vx, y: vy, s: ps }, g.t);
+      if (g.kind === 'espagueti') spaghetti(ctx, { x: vx, y: vy, s: ps }, g.t);
+      if (g.kind === 'patito') rubberDuck(ctx, { x: vx, y: vy, s: ps }, g.t);
+      if (g.kind === 'postits') postIts(ctx, { x: vx, y: vy, s: ps }, g.t, lead.todos ?? 0);
+      if (g.kind === 'lego') legoTower(ctx, { x: vx, y: vy, s: ps }, g.t, lead.lastFailed === true);
+      if (g.kind === 'encaje') legoMerge(ctx, { x: vx, y: vy + jump, s: ps }, g.t, lead.lastFailed === true);
+      if (g.kind === 'dron') deployDrone(ctx, { x: vx, y: vy, s: ps }, g.t, L.zone.hi);
+      if (g.kind === 'enjambre') droneSwarm(ctx, { x: vx, y: vy, s: sc }, g.t, L.zone.hi);
+      if (g.kind === 'piloto') pilotDrone(ctx, { x: vx, y: vy, s: ps }, g.t, L.zone.hi);
+      if (g.kind === 'compacta') paperPress(ctx, { x: vx, y: vy, s: ps }, g.t);
+      if (g.kind === 'tarta') birthdayCake(ctx, { x: vx, y: vy, s: ps }, g.t, repoBirthday(lead.repoBorn, now));
+      if (g.kind === 'fuegos') droneShow(ctx, { x: vx, y: vy, s: sc }, g.t, releaseTag(lead.detail ?? ''), L.zone.hi);
+      if (g.kind === 'malabares') juggling(ctx, { x: vx, y: vy, s: ps }, g.t, lead.lastFailed === true);
+      if (g.kind === 'finde') {
+        for (const h of heads(a)) strawHat(ctx, vx + h.dx * sc, vy + h.top * sc, sc);
+        weekendBreak(ctx, { x: vx, y: vy, s: ps }, g.t, new Date(now).getDay() === 0 ? words.sunday : words.saturday);
+      }
+      if (g.kind === 'quimica') {
+        chemistry(ctx, { x: vx, y: vy, s: ps }, g.t, lead.lastFailed === true && a.pose !== 'sentado');
+        // Gafas de laboratorio, si mira de frente.
+        if (a.pose === 'sentado' && g.t > 0.05 && g.t < 0.95) for (const h of heads(a)) labGoggles(ctx, vx + h.dx * sc, vy + (h.top + GOGGLES_Y) * sc, sc);
+      }
+      if (g.kind === 'mariposa') butterfly(ctx, { x: vx, y: vy, s: Math.max(sc, 0.5) }, g.t);
+    }
     if (a.pose === 'bufido') {
       outlined(ctx, words.hiss, vx - 330 * sc, vy - 300 * sc, Math.round(34 * sc + 4), '#FFFFFF');
       outlined(ctx, words.hiss, vx + 200 * sc, vy - 300 * sc, Math.round(34 * sc + 4), '#FFFFFF');
     }
+  }
+  if (live?.kind === 'confeti') confetti(ctx, RW, DESIGN_H, live.t);
+  if (live?.kind === 'trueno' && live.t < 0.4) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = `rgba(235,240,255,${0.55 * (1 - live.t / 0.4)})`;
+    ctx.fillRect(0, 0, width, height);
+    toDesign();
+    outlined(ctx, words.thunder, WINDOW.x + WINDOW.w / 2, WINDOW.y - 10, 40, '#FFFFFF');
+  }
+  // Gestos entre dos gatos: el id lleva las dos sesiones.
+  const [pa, pb] = live ? live.id.split(/[+>]/).map((id) => spots.get(id)) : [];
+  if (live && pa && pb) {
+    if (live.kind === 'chocala') highFive(ctx, pa, pb, live.t);
+    if (live.kind === 'distrae') mugPush(ctx, { ...pa, s: Math.max(pa.s, 0.45) }, { ...pb, s: Math.max(pb.s, 0.45) }, pa.a.sill ? floorAt(0.9) - pa.y : 0, live.t);
+    if (live.kind === 'sabio') {
+      const h = heads(pa.a)[pa.i];
+      const top = pa.y + (h?.top ?? -258) * pa.s;
+      if (h?.chest !== undefined) sageGlasses(ctx, pa.x, pa.y - 198 * pa.s, pa.s);
+      wizardHat(ctx, pa.x, top, pa.s);
+      const dir = pb.x >= pa.x ? 1 : -1;
+      wand(ctx, { x: pa.x + dir * 110 * pa.s, y: pa.y - 150 * pa.s }, { x: pb.x, y: pb.y - 210 * pb.s }, pa.s, live.t);
+    }
+  }
+  if (live?.kind === 'cajas') fallingBox(ctx, L.zone.lo + MARGIN + 330 + ((now / 60_000) % 7) / 7 * (L.zone.hi - L.zone.lo - 390 - MARGIN), floorAt(0.97), 0.8, live.t);
+  if (duelFlash > 0) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = `rgba(235,240,255,${duelFlash * 0.4})`;
+    ctx.fillRect(0, 0, width, height);
+    toDesign();
   }
   if (L.overflow.length) {
     tag(ctx, L.floor.right - 50, floorAt(0.7) + 4, `+${L.overflow.length}`, words.more, '#8A96A6', 16, 0.9, 110);

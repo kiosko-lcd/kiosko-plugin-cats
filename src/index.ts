@@ -7,12 +7,16 @@
  *
  * Plus an interlude: the quarter-hour laser-sword duel between two sessions.
  */
-import { definePlugin, defineInterlude, defineWidget, t, type Location, type Localized } from '@kiosko/sdk';
+import { join } from 'node:path';
+import { definePlugin, defineInterlude, defineWidget, t, type AnimationFrame, type Location, type Localized } from '@kiosko/sdk';
 import { sunTimes, type SunTimes, type Weather } from '@loksly/weather-astro';
 import { useCanvas } from './canvas.ts';
 import { DUEL_FPS, planDuel, prerenderDuel } from './duel-egg.ts';
 import { ROOMS, type RoomName } from './room.ts';
-import { renderScene, type SceneOptions } from './scene.ts';
+import { FORCED_KINDS, MOVE_SECONDS, candidates, gestureAt, placements, planGesture, significantMove, type GestureKind, type Placement } from './anim.ts';
+import { lastBuiltSet, renderScene, sceneLayout, surroundings, type SceneInput, type SceneOptions } from './scene.ts';
+import { readShelf, type ShelfView } from './shelf.ts';
+import { addTrophy, loadTrophies, thisWeek } from './trophies.ts';
 import { filterProjects, sessionsOf, zombieMsOf, type SessionView } from './types.ts';
 import { wordsFor } from './words.ts';
 
@@ -33,6 +37,15 @@ const ROOM_LABELS: Record<'rotate' | RoomName, Localized> = {
   desierto: { en: 'Desert', es: 'Desierto' },
   bosque: { en: 'Forest', es: 'Bosque' },
 };
+
+/** Frames per second of the gestures: what the panel takes without dropping them. */
+const ANIM_FPS = 12;
+
+/**
+ * Gestures that need more than the room has: the console game (the platformer
+ * of the agents plugin) and the fireman (the heat tower is another tile).
+ */
+const UNSUPPORTED = new Set<GestureKind>(['consola', 'espuma']);
 
 const COLUMN = { none: 'none', right: 'derecha', left: 'izquierda', alternate: 'alternar' } as const;
 
@@ -64,6 +77,14 @@ const roomOptions = t.object({
       right: { en: 'Right', es: 'Derecha' },
       left: { en: 'Left', es: 'Izquierda' },
       alternate: { en: 'Alternate', es: 'Alternar' },
+    },
+  }),
+  shelf: t.boolean({
+    default: true,
+    label: { en: 'Week shelf', es: 'Estantería de la semana' },
+    help: {
+      en: 'A cabinet at the back with a book per commit of yours this week and a binder per merged MR/PR. Read with git in the repos your sessions have been in.',
+      es: 'Un mueble al fondo con un libro por cada commit tuyo de esta semana y un archivador por MR/PR fusionada. Se lee con git en los repos donde han estado tus sesiones.',
     },
   }),
   swapSidesMs: t.duration({ default: 60 * 60_000, min: 60_000, label: { en: 'Swap sides every', es: 'Cambiar de lado cada' }, advanced: true }),
@@ -125,6 +146,14 @@ export function demoWeather(now: number): Weather {
   };
 }
 
+/** The scene's gesture or walk for a frame of the animation (see `animation`). */
+export function animationOf(a: AnimationFrame | undefined): Pick<SceneInput, 'anim' | 'move'> {
+  if (!a) return {};
+  const p = a.plan.params as { kind: string; id?: string; from?: Record<string, Placement> };
+  if (p.kind === 'walk') return { move: { from: p.from ?? {}, t: a.t } };
+  return { anim: gestureAt({ id: p.id ?? '', kind: p.kind as GestureKind }, a.i, a.plan.frames) };
+}
+
 export const room = defineWidget({
   id: 'room',
   name: { en: 'Cats room', es: 'Habitación de gatos' },
@@ -141,7 +170,51 @@ export const room = defineWidget({
   sources: ['agents/sessions', 'weather/current'],
   // The wall clock moves every minute.
   redraw: 'minute',
+  // The week's git log: a few minutes are plenty, a commit shows on the next read.
+  intervalMs: 3 * MIN,
+  async fetch({ options, sources, now, dataDir, cacheDir, signal }): Promise<{ shelf: ShelfView | null; trophies: string[] }> {
+    // The week's LEGO sets, noted when each build ends (see `animationEnded`).
+    const trophies = thisWeek(loadTrophies(join(dataDir, 'trophies.json')), now);
+    if (!options.shelf) return { shelf: null, trophies };
+    const repos = filterProjects(sessionsOf(sources), options.projects).map((s) => s.repo);
+    return { shelf: await readShelf(join(cacheDir || dataDir, 'shelf.json'), repos, now, signal), trophies };
+  },
+  animationEnded({ plan, completed, now, dataDir, log }) {
+    // A set that got built to the end is a trophy for the week.
+    if (!completed || (plan.params as { kind?: string } | undefined)?.kind !== 'montaje') return;
+    const id = lastBuiltSet();
+    if (!id) return;
+    try {
+      addTrophy(join(dataDir, 'trophies.json'), id, Date.now());
+    } catch (err) {
+      log(`could not note the trophy: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  },
   idle: ({ sources, options }) => !filterProjects(sessionsOf(sources), options.projects).some((s) => s.startsAt === undefined),
+  // A gesture now and then (a blink, a tail, a yawn…) and a walk when a cat changes spot.
+  animationGap: { minMs: 15_000, maxMs: 40_000 },
+  animationCooldownMs: 10_000,
+  animation({ trigger, box, options, sources, now, location, prev, rnd }) {
+    const width = Math.max(1, Math.round(box.w)), height = Math.max(1, Math.round(box.h));
+    const weather = sources['weather/current'] as Weather | undefined;
+    const scene = { sessions: filterProjects(sessionsOf(sources), options.projects), now, width, height, options: sceneOptions(options, zombieMsOf(sources)) };
+    const actors = sceneLayout(scene).actors;
+    if (trigger === 'data') {
+      // Someone moved (a session started, finished or changed what it does): the cats walk to their new spots.
+      if (!prev) return null;
+      const before = sceneLayout({ ...scene, sessions: filterProjects(sessionsOf(prev.sources), options.projects) }).actors;
+      const from = placements(before);
+      if (!significantMove(from, placements(actors))) return null;
+      return { id: 'walk', frames: Math.round(MOVE_SECONDS * ANIM_FPS) + 1, fps: ANIM_FPS, params: { kind: 'walk', from: Object.fromEntries(from) } };
+    }
+    const around = surroundings({ ...scene, weather: weather ?? null, sun: sunFor(now, weather, location) });
+    const list = candidates(actors, now, false, around).filter((c) => !UNSUPPORTED.has(c.kind));
+    const pick = list[Math.floor(rnd() * list.length)];
+    if (!pick) return null;
+    const plan = planGesture(pick, ANIM_FPS, FORCED_KINDS.includes(pick.kind));
+    // The plan says the frame to hold at; the SDK wants it as a fraction of the animation.
+    return { id: plan.id, frames: plan.frames, fps: plan.fps, params: plan.params, interruptible: plan.interruptible, ...(plan.hold ? { hold: { at: plan.hold.at / (plan.frames - 1), ms: plan.hold.ms } } : {}) };
+  },
   render(g, ctx) {
     const { box, now, options, sources } = ctx;
     useCanvas(ctx.canvas);
@@ -156,6 +229,9 @@ export const room = defineWidget({
       words: wordsFor(ctx),
       weather: weather ?? null,
       sun: sunFor(now, weather, ctx.location),
+      shelf: options.shelf ? ctx.data?.shelf ?? null : null,
+      trophies: ctx.data?.trophies ?? [],
+      ...animationOf(ctx.anim),
     });
     g.drawImage(frame, box.x, box.y, box.w, box.h);
   },
@@ -189,7 +265,7 @@ export const duel = defineInterlude({
 export default definePlugin({
   id: 'cats',
   name: { en: 'Cats room', es: 'Habitación de gatos' },
-  version: '0.1.0',
+  version: '0.2.0',
   description: {
     en: 'Your AI agent sessions as cats in a room: what needs you comes forward. From aimonitor.',
     es: 'Tus sesiones de agentes IA como gatos en una habitación: lo que te reclama se acerca. De aimonitor.',
