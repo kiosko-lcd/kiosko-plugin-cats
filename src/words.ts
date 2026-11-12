@@ -6,6 +6,8 @@
 import type { Formatters, Localized } from '@kiosko/sdk';
 
 export interface Words {
+  /** Language of the table, for the texts painted inside the props. */
+  lang: 'es' | 'en';
   /** Sign board of the cat that asks for permission. */
   mayI: string;
   asksPermission: string;
@@ -17,6 +19,20 @@ export interface Words {
   inTime: (t: string) => string;
   /** "+3 more" tag when not every cat fits. */
   more: string;
+  /** Abbreviated "week", for the plate of the shelf ("wk 46"). */
+  week: string;
+  /** Texts of the gestures: the cat's reactions and the little signs they hold. */
+  gameOver: string;
+  gameWin: string;
+  detachedHead: string;
+  relief: string;
+  whereWas: string;
+  server: string;
+  boo: string;
+  silent: string;
+  sunday: string;
+  saturday: string;
+  thunder: string;
   uncommitted: string;
   ready: string;
   waiting: string;
@@ -43,6 +59,7 @@ export interface Words {
 type Table = Omit<Words, 'elapsed' | 'countdown'>;
 
 const ES: Table = {
+  lang: 'es',
   mayI: '¿PUEDO?',
   asksPermission: 'pide permiso',
   goOn: '¿sigo?',
@@ -50,6 +67,18 @@ const ES: Table = {
   now: 'ahora',
   inTime: (t) => `en ${t}`,
   more: 'más',
+  week: 'sem.',
+  gameOver: '¡nooo!',
+  gameWin: '¡bien!',
+  detachedHead: 'HEAD separado',
+  relief: 'haah…',
+  whereWas: '¿dónde estaba…?',
+  server: 'servidor',
+  boo: '¡buu!',
+  silent: '(mudo)',
+  sunday: 'domingo',
+  saturday: 'sábado',
+  thunder: '¡BRRUM!',
   uncommitted: 'sin commit',
   ready: 'lista',
   waiting: 'espera',
@@ -66,6 +95,7 @@ const ES: Table = {
 };
 
 const EN: Table = {
+  lang: 'en',
   mayI: 'MAY I?',
   asksPermission: 'asks for permission',
   goOn: 'go on?',
@@ -73,6 +103,18 @@ const EN: Table = {
   now: 'now',
   inTime: (t) => `in ${t}`,
   more: 'more',
+  week: 'wk',
+  gameOver: 'nooo!',
+  gameWin: 'yes!',
+  detachedHead: 'detached HEAD',
+  relief: 'phew…',
+  whereWas: 'where was it…?',
+  server: 'server',
+  boo: 'boo!',
+  silent: '(silent)',
+  sunday: 'Sunday',
+  saturday: 'Saturday',
+  thunder: 'BOOM!',
   uncommitted: 'uncommitted',
   ready: 'ready',
   waiting: 'waiting',
