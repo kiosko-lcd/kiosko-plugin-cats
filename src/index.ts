@@ -265,7 +265,7 @@ export const duel = defineInterlude({
 export default definePlugin({
   id: 'cats',
   name: { en: 'Cats room', es: 'Habitación de gatos' },
-  version: '0.2.0',
+  version: '0.2.1',
   description: {
     en: 'Your AI agent sessions as cats in a room: what needs you comes forward. From aimonitor.',
     es: 'Tus sesiones de agentes IA como gatos en una habitación: lo que te reclama se acerca. De aimonitor.',

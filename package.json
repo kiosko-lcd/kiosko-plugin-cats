@@ -1,6 +1,6 @@
 {
   "name": "kiosko-plugin-cats",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "The cats room from aimonitor: every AI agent session is a cat, and the one that needs you comes forward. Plus a quarter-hour laser-sword duel.",
   "type": "module",
   "license": "MIT",
