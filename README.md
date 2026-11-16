@@ -21,6 +21,13 @@ npm install --prefix ~/.config/kiosko/plugins kiosko-plugin-cats
 - The `agents/sessions` source from [kiosko-plugin-agents](../kiosko-plugin-agents) (each session is a cat).
 - Optional: `weather/current` from [kiosko-plugin-weather](../kiosko-plugin-weather) for the sky in the window.
 
+## What it does on your machine
+
+- **Runs**: `git`.
+
+- Needs `agents/sessions` from [kiosko-plugin-agents](../kiosko-plugin-agents).
+- Uses `weather/current` from [kiosko-plugin-weather](../kiosko-plugin-weather) when it is there.
+
 ## Widgets
 
 ### Cats room — `cats/room`
@@ -37,7 +44,20 @@ Uses: `agents/sessions`, `weather/current`.
 | `rooms` | list | `[]` | Rooms to rotate through. With "A different one every day". Empty: all of them. |
 | `projects` | list | `[]` | Projects. Which sessions get a cat. Empty: all. Project, repository or folder names or patterns, comma-separated: * matches anything, a leading ! leaves out (web-app, acme-*, !scratch). |
 | `column` | `none` \| `right` \| `left` \| `alternate` | `"none"` | Strip without cats. Keeps a strip of the floor free, like the old card column. "Alternate" swaps sides now and then, against burn-in. |
+| `shelf` | boolean | `true` | Week shelf. A cabinet at the back with a book per commit of yours this week and a binder per merged MR/PR. Read with git in the repos your sessions have been in. |
 | `swapSidesMs` | duration (ms) | `3600000` | Swap sides every |
+
+## Interludes
+
+### Quarter-hour duel — `cats/duel`
+
+Two of your sessions fight it out with laser swords in the cats room. The one with fewer uncommitted files wins. With a single session, it fights the bug. Add it in Kiosko → Screens → Interludes.
+
+| Option | Type | Default | |
+|---|---|---|---|
+| `room` | `rotate` \| `estudio` \| `cocina` \| `cabana` \| `atico` \| `oficina` \| `japonesa` \| `acuario` \| `arcade` \| `ventanal` \| `playa` \| `espacio` \| `antartida` \| `desierto` \| `bosque` | `"rotate"` | Room. Indoors or out, each with its own window, lamp and floor. |
+| `rooms` | list | `[]` | Rooms to rotate through. With "A different one every day". Empty: all of them. |
+| `projects` | list | `[]` | Projects. Which sessions get a cat. Empty: all. Project, repository or folder names or patterns, comma-separated: * matches anything, a leading ! leaves out (web-app, acme-*, !scratch). |
 
 ### Gestures
 
@@ -53,18 +73,6 @@ screen's *max fps* caps the rate.
 Not here yet: the console game (needs the platformer of the agents plugin),
 the fireman (the heat tower is another tile), the week's LEGO trophies on the
 cabinet and the reactions to RAM, quota and network.
-
-## Interludes
-
-### Quarter-hour duel — `cats/duel`
-
-Two of your sessions fight it out with laser swords in the cats room. The one with fewer uncommitted files wins. With a single session, it fights the bug. Add it in Kiosko → Screens → Interludes.
-
-| Option | Type | Default | |
-|---|---|---|---|
-| `room` | `rotate` \| `estudio` \| `cocina` \| `cabana` \| `atico` \| `oficina` \| `japonesa` \| `acuario` \| `arcade` \| `ventanal` \| `playa` \| `espacio` \| `antartida` \| `desierto` \| `bosque` | `"rotate"` | Room. Indoors or out, each with its own window, lamp and floor. |
-| `rooms` | list | `[]` | Rooms to rotate through. With "A different one every day". Empty: all of them. |
-| `projects` | list | `[]` | Projects. Which sessions get a cat. Empty: all. Project, repository or folder names or patterns, comma-separated: * matches anything, a leading ! leaves out (web-app, acme-*, !scratch). |
 
 ## Development
 

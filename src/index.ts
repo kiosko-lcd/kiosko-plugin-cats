@@ -266,6 +266,10 @@ export default definePlugin({
   id: 'cats',
   name: { en: 'Cats room', es: 'Habitación de gatos' },
   version: '0.2.1',
+  sdk: '^0.2.0',
+  permissions: { exec: ['git'] },
+  requires: ['agents/sessions'],
+  optional: ['weather/current'],
   description: {
     en: 'Your AI agent sessions as cats in a room: what needs you comes forward. From aimonitor.',
     es: 'Tus sesiones de agentes IA como gatos en una habitación: lo que te reclama se acerca. De aimonitor.',
@@ -275,4 +279,18 @@ export default definePlugin({
   icon: 'cat',
   widgets: [room],
   interludes: [duel],
+  templates: [
+    {
+      id: 'room',
+      name: { en: 'Cats room', es: 'Habitación de gatos' },
+      icon: 'cat',
+      wide: [
+        { x: 0, y: 0, w: 7 / 10, h: 1, widgets: ['room'], chrome: 'bare' },
+        { x: 7 / 10, y: 0, w: 3 / 10, h: 1, widgets: ['weather/forecast', 'mirror/countdown', 'mirror/onthisday', 'usage/rail'] },
+      ],
+      square: [
+        { x: 0, y: 0, w: 1, h: 1, widgets: ['room'], chrome: 'bare' },
+      ],
+    },
+  ],
 });

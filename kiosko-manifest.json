@@ -1,0 +1,432 @@
+{
+  "manifest": 1,
+  "id": "cats",
+  "package": "kiosko-plugin-cats",
+  "name": {
+    "en": "Cats room",
+    "es": "Habitación de gatos"
+  },
+  "version": "0.2.1",
+  "description": {
+    "en": "Your AI agent sessions as cats in a room: what needs you comes forward. From aimonitor.",
+    "es": "Tus sesiones de agentes IA como gatos en una habitación: lo que te reclama se acerca. De aimonitor."
+  },
+  "author": "Kiosko",
+  "license": "MIT",
+  "homepage": "https://github.com/kiosko-lcd/kiosko-plugin-cats#readme",
+  "repository": "https://github.com/kiosko-lcd/kiosko-plugin-cats.git",
+  "icon": "cat",
+  "sdk": "^0.2.0",
+  "platforms": [
+    "linux",
+    "darwin",
+    "win32"
+  ],
+  "languages": [
+    "en",
+    "es"
+  ],
+  "categories": [
+    "scene"
+  ],
+  "tags": [
+    "agents",
+    "claude",
+    "gemini",
+    "illustration"
+  ],
+  "permissions": {
+    "exec": [
+      "git"
+    ]
+  },
+  "riskyOptions": [],
+  "requires": [
+    {
+      "type": "agents/sessions",
+      "plugin": "agents"
+    }
+  ],
+  "optional": [
+    {
+      "type": "weather/current",
+      "plugin": "weather"
+    }
+  ],
+  "widgets": [
+    {
+      "type": "cats/room",
+      "name": {
+        "en": "Cats room",
+        "es": "Habitación de gatos"
+      },
+      "description": {
+        "en": "Each AI agent session is a cat in a room with the real sky outside: the ones that need you come forward, the ones working sit at their laptops in the back.",
+        "es": "Cada sesión de un agente IA es un gato en una habitación con el cielo de verdad: los que te necesitan se acercan y los que trabajan se quedan al fondo con su portátil."
+      },
+      "icon": "cat",
+      "category": "scene",
+      "tags": [
+        "agents",
+        "claude",
+        "gemini",
+        "illustration"
+      ],
+      "size": {
+        "min": {
+          "w": 960,
+          "h": 300
+        },
+        "preferred": {
+          "w": 1920,
+          "h": 462
+        }
+      },
+      "chrome": "bare",
+      "sources": [
+        "agents/sessions",
+        "weather/current"
+      ],
+      "options": {
+        "default": {
+          "room": "rotate",
+          "rooms": [],
+          "projects": [],
+          "column": "none",
+          "shelf": true,
+          "swapSidesMs": 3600000
+        },
+        "x-ui": {},
+        "type": "object",
+        "properties": {
+          "room": {
+            "title": "Room",
+            "description": "Indoors or out, each with its own window, lamp and floor.",
+            "default": "rotate",
+            "x-ui": {
+              "label": {
+                "en": "Room",
+                "es": "Habitación"
+              },
+              "help": {
+                "en": "Indoors or out, each with its own window, lamp and floor.",
+                "es": "Dentro o fuera, cada una con su ventana, su lámpara y su suelo."
+              },
+              "labels": {
+                "rotate": {
+                  "en": "A different one every day",
+                  "es": "Una distinta cada día"
+                },
+                "estudio": {
+                  "en": "Study",
+                  "es": "Estudio"
+                },
+                "cocina": {
+                  "en": "Kitchen",
+                  "es": "Cocina"
+                },
+                "cabana": {
+                  "en": "Log cabin",
+                  "es": "Cabaña"
+                },
+                "atico": {
+                  "en": "Attic",
+                  "es": "Ático"
+                },
+                "oficina": {
+                  "en": "Office",
+                  "es": "Oficina"
+                },
+                "japonesa": {
+                  "en": "Japanese room",
+                  "es": "Habitación japonesa"
+                },
+                "acuario": {
+                  "en": "Aquarium",
+                  "es": "Acuario"
+                },
+                "arcade": {
+                  "en": "Arcade",
+                  "es": "Recreativos"
+                },
+                "ventanal": {
+                  "en": "Picture window",
+                  "es": "Ventanal"
+                },
+                "playa": {
+                  "en": "Beach",
+                  "es": "Playa"
+                },
+                "espacio": {
+                  "en": "Outer space",
+                  "es": "Espacio"
+                },
+                "antartida": {
+                  "en": "Antarctica",
+                  "es": "Antártida"
+                },
+                "desierto": {
+                  "en": "Desert",
+                  "es": "Desierto"
+                },
+                "bosque": {
+                  "en": "Forest",
+                  "es": "Bosque"
+                }
+              }
+            },
+            "type": "string",
+            "enum": [
+              "rotate",
+              "estudio",
+              "cocina",
+              "cabana",
+              "atico",
+              "oficina",
+              "japonesa",
+              "acuario",
+              "arcade",
+              "ventanal",
+              "playa",
+              "espacio",
+              "antartida",
+              "desierto",
+              "bosque"
+            ]
+          },
+          "rooms": {
+            "title": "Rooms to rotate through",
+            "description": "With \"A different one every day\". Empty: all of them.",
+            "default": [],
+            "x-ui": {
+              "label": {
+                "en": "Rooms to rotate through",
+                "es": "Habitaciones por las que rotar"
+              },
+              "help": {
+                "en": "With \"A different one every day\". Empty: all of them.",
+                "es": "Con «Una distinta cada día». Vacío: todas."
+              }
+            },
+            "type": "array",
+            "items": {
+              "default": "estudio",
+              "x-ui": {
+                "labels": {
+                  "rotate": {
+                    "en": "A different one every day",
+                    "es": "Una distinta cada día"
+                  },
+                  "estudio": {
+                    "en": "Study",
+                    "es": "Estudio"
+                  },
+                  "cocina": {
+                    "en": "Kitchen",
+                    "es": "Cocina"
+                  },
+                  "cabana": {
+                    "en": "Log cabin",
+                    "es": "Cabaña"
+                  },
+                  "atico": {
+                    "en": "Attic",
+                    "es": "Ático"
+                  },
+                  "oficina": {
+                    "en": "Office",
+                    "es": "Oficina"
+                  },
+                  "japonesa": {
+                    "en": "Japanese room",
+                    "es": "Habitación japonesa"
+                  },
+                  "acuario": {
+                    "en": "Aquarium",
+                    "es": "Acuario"
+                  },
+                  "arcade": {
+                    "en": "Arcade",
+                    "es": "Recreativos"
+                  },
+                  "ventanal": {
+                    "en": "Picture window",
+                    "es": "Ventanal"
+                  },
+                  "playa": {
+                    "en": "Beach",
+                    "es": "Playa"
+                  },
+                  "espacio": {
+                    "en": "Outer space",
+                    "es": "Espacio"
+                  },
+                  "antartida": {
+                    "en": "Antarctica",
+                    "es": "Antártida"
+                  },
+                  "desierto": {
+                    "en": "Desert",
+                    "es": "Desierto"
+                  },
+                  "bosque": {
+                    "en": "Forest",
+                    "es": "Bosque"
+                  }
+                }
+              },
+              "type": "string",
+              "enum": [
+                "estudio",
+                "cocina",
+                "cabana",
+                "atico",
+                "oficina",
+                "japonesa",
+                "acuario",
+                "arcade",
+                "ventanal",
+                "playa",
+                "espacio",
+                "antartida",
+                "desierto",
+                "bosque"
+              ]
+            }
+          },
+          "projects": {
+            "title": "Projects",
+            "description": "Which sessions get a cat. Empty: all. Project, repository or folder names or patterns, comma-separated: * matches anything, a leading ! leaves out (web-app, acme-*, !scratch).",
+            "default": [],
+            "x-ui": {
+              "label": {
+                "en": "Projects",
+                "es": "Proyectos"
+              },
+              "help": {
+                "en": "Which sessions get a cat. Empty: all. Project, repository or folder names or patterns, comma-separated: * matches anything, a leading ! leaves out (web-app, acme-*, !scratch).",
+                "es": "Qué sesiones tienen gato. Vacío: todas. Nombres o patrones de proyecto, repositorio o carpeta, separados por comas: * vale por cualquier cosa y un ! delante excluye (web-app, acme-*, !pruebas)."
+              },
+              "widget": "filter"
+            },
+            "type": "array",
+            "items": {
+              "default": "",
+              "x-ui": {
+                "placeholder": "name, group/*, !old-*"
+              },
+              "type": "string"
+            },
+            "x-filter": true
+          },
+          "column": {
+            "title": "Strip without cats",
+            "description": "Keeps a strip of the floor free, like the old card column. \"Alternate\" swaps sides now and then, against burn-in.",
+            "default": "none",
+            "x-ui": {
+              "label": {
+                "en": "Strip without cats",
+                "es": "Franja sin gatos"
+              },
+              "help": {
+                "en": "Keeps a strip of the floor free, like the old card column. \"Alternate\" swaps sides now and then, against burn-in.",
+                "es": "Deja libre una franja del suelo, como la antigua columna de tarjetas. «Alternar» cambia de lado cada cierto tiempo, contra el quemado."
+              },
+              "labels": {
+                "none": {
+                  "en": "None",
+                  "es": "Ninguna"
+                },
+                "right": {
+                  "en": "Right",
+                  "es": "Derecha"
+                },
+                "left": {
+                  "en": "Left",
+                  "es": "Izquierda"
+                },
+                "alternate": {
+                  "en": "Alternate",
+                  "es": "Alternar"
+                }
+              }
+            },
+            "type": "string",
+            "enum": [
+              "none",
+              "right",
+              "left",
+              "alternate"
+            ]
+          },
+          "shelf": {
+            "title": "Week shelf",
+            "description": "A cabinet at the back with a book per commit of yours this week and a binder per merged MR/PR. Read with git in the repos your sessions have been in.",
+            "default": true,
+            "x-ui": {
+              "label": {
+                "en": "Week shelf",
+                "es": "Estantería de la semana"
+              },
+              "help": {
+                "en": "A cabinet at the back with a book per commit of yours this week and a binder per merged MR/PR. Read with git in the repos your sessions have been in.",
+                "es": "Un mueble al fondo con un libro por cada commit tuyo de esta semana y un archivador por MR/PR fusionada. Se lee con git en los repos donde han estado tus sesiones."
+              }
+            },
+            "type": "boolean"
+          },
+          "swapSidesMs": {
+            "title": "Swap sides every",
+            "default": 3600000,
+            "x-ui": {
+              "label": {
+                "en": "Swap sides every",
+                "es": "Cambiar de lado cada"
+              },
+              "advanced": true,
+              "unit": "ms"
+            },
+            "type": "integer",
+            "minimum": 60000
+          }
+        }
+      },
+      "screenshot": "docs/room.png",
+      "animated": true,
+      "urgent": false
+    }
+  ],
+  "sources": [],
+  "interludes": [
+    {
+      "type": "cats/duel",
+      "name": {
+        "en": "Quarter-hour duel",
+        "es": "Duelo del cuarto de hora"
+      },
+      "description": {
+        "en": "Two of your sessions fight it out with laser swords in the cats room. The one with fewer uncommitted files wins. With a single session, it fights the bug.",
+        "es": "Dos de tus sesiones se baten con espadas láser en la habitación de los gatos. Gana la que tiene menos ficheros sin commit. Con una sola, se bate con el bug."
+      },
+      "icon": "swords",
+      "fps": 8
+    }
+  ],
+  "templates": [
+    {
+      "id": "room",
+      "name": {
+        "en": "Cats room",
+        "es": "Habitación de gatos"
+      },
+      "icon": "cat",
+      "widgets": [
+        "cats/room",
+        "weather/forecast",
+        "mirror/countdown",
+        "mirror/onthisday",
+        "usage/rail"
+      ]
+    }
+  ]
+}
