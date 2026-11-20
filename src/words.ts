@@ -138,6 +138,43 @@ const EN: Table = {
   onPoints: 'on points',
 };
 
+const DE: Table = {
+  lang: 'de',
+  mayI: 'DARF ICH?',
+  asksPermission: 'bittet um Erlaubnis',
+  goOn: 'weiter?',
+  meeting: 'MEETING',
+  now: 'jetzt',
+  inTime: (t) => `in ${t}`,
+  more: 'mehr',
+  week: (n) => `KW ${n}`,
+  commits: count('de', { one: '{n} Commit', other: '{n} Commits' }),
+  gameOver: 'neiiin!',
+  gameWin: 'jaaa!',
+  detachedHead: 'HEAD losgelöst',
+  relief: 'puh…',
+  whereWas: 'wo war ich…?',
+  server: 'Server',
+  boo: 'buh!',
+  silent: '(stumm)',
+  sunday: 'Sonntag',
+  saturday: 'Samstag',
+  thunder: 'WUMMS!',
+  uncommitted: 'nicht committet',
+  ready: 'fertig',
+  waiting: 'wartet',
+  fragile: 'ZERBRECHLICH',
+  hiss: 'FAUCH!',
+  notOnFriday: '(nicht freitags)',
+  duelTitle: 'VIERTELSTUNDEN-DUELL',
+  versus: (a, b) => `${a}  gegen  ${b}`,
+  wins: (n) => `${n} gewinnt`,
+  theBug: 'der Bug',
+  bugHadNoChance: 'der Bug hatte keine Chance',
+  uncommittedFiles: (n) => (n === 0 ? 'keine offenen Dateien' : count('de', { one: 'eine offene Datei', other: '{n} offene Dateien' })(n)),
+  onPoints: 'nach Punkten',
+};
+
 const ZH_HANT: Table = {
   lang: 'zh-Hant',
   mayI: '可以嗎？',
@@ -212,7 +249,7 @@ const ZH_HANS: Table = {
   onPoints: '点数获胜',
 };
 
-const TABLES: Record<PropLang, Table> = { es: ES, en: EN, 'zh-Hant': ZH_HANT, 'zh-Hans': ZH_HANS };
+const TABLES: Record<PropLang, Table> = { es: ES, en: EN, de: DE, 'zh-Hant': ZH_HANT, 'zh-Hans': ZH_HANS };
 
 /**
  * The words in the panel's language, picked with `ctx.pickLanguage` (so a

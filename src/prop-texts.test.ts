@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { registerFonts } from '@kiosko/core';
 import { useCanvas } from './canvas.ts';
-import { EN, ES, propTexts, propTextsFor, usePropTexts, type PropTexts } from './prop-texts.ts';
+import { DE, EN, ES, propTexts, propTextsFor, usePropTexts, type PropTexts } from './prop-texts.ts';
 import { outlined, birthdayCake } from './props.ts';
 import type { X } from './paint.ts';
 
@@ -14,7 +14,8 @@ afterEach(() => usePropTexts(ES));
 
 test('prop-texts: ES and EN have the same keys and no empty strings', () => {
   assert.deepEqual(Object.keys(EN).sort(), Object.keys(ES).sort());
-  for (const table of [ES, EN]) {
+  assert.deepEqual(Object.keys(DE).sort(), Object.keys(ES).sort());
+  for (const table of [ES, EN, DE]) {
     for (const [k, v] of Object.entries(table)) {
       if (typeof v === 'string') assert.ok(v.length > 0, k);
     }
@@ -25,7 +26,7 @@ test('prop-texts: ES and EN have the same keys and no empty strings', () => {
 });
 
 test('prop-texts: the functions return strings with their numbers', () => {
-  for (const t of [ES, EN]) {
+  for (const t of [ES, EN, DE]) {
     assert.match(t.years(3), /3/);
     assert.match(t.weekendIn('x-day'), /x-day/);
     assert.match(t.packages(137), /137/);
@@ -45,6 +46,8 @@ test('prop-texts: the functions return strings with their numbers', () => {
   assert.equal(ES.packages(274), '+274 paquetes');
   assert.equal(propTextsFor('zh-Hant').files(3), '×3 個檔案');
   assert.equal(propTextsFor('zh-Hans').years(2), '2 岁了！');
+  assert.equal(propTextsFor('de').files(1), '×1 Datei');
+  assert.equal(propTextsFor('de').years(3), '3 Jahre!');
 });
 
 test('prop-texts: no Spanish literals are left in props.ts or lego.ts', () => {

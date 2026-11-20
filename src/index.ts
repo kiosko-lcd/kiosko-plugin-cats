@@ -21,21 +21,21 @@ import { filterProjects, sessionsOf, zombieMsOf, type SessionView } from './type
 import { wordsFor } from './words.ts';
 
 const ROOM_LABELS: Record<'rotate' | RoomName, Localized> = {
-  rotate: { en: 'A different one every day', es: 'Una distinta cada día', 'zh-Hant': '每天換一個', 'zh-Hans': '每天换一个' },
-  estudio: { en: 'Study', es: 'Estudio', 'zh-Hant': '書房', 'zh-Hans': '书房' },
-  cocina: { en: 'Kitchen', es: 'Cocina', 'zh-Hant': '廚房', 'zh-Hans': '厨房' },
-  cabana: { en: 'Log cabin', es: 'Cabaña', 'zh-Hant': '小木屋', 'zh-Hans': '小木屋' },
-  atico: { en: 'Attic', es: 'Ático', 'zh-Hant': '閣樓', 'zh-Hans': '阁楼' },
-  oficina: { en: 'Office', es: 'Oficina', 'zh-Hant': '辦公室', 'zh-Hans': '办公室' },
-  japonesa: { en: 'Japanese room', es: 'Habitación japonesa', 'zh-Hant': '和室', 'zh-Hans': '和室' },
-  acuario: { en: 'Aquarium', es: 'Acuario', 'zh-Hant': '水族館', 'zh-Hans': '水族馆' },
-  arcade: { en: 'Arcade', es: 'Recreativos', 'zh-Hant': '遊樂場', 'zh-Hans': '游戏厅' },
-  ventanal: { en: 'Picture window', es: 'Ventanal', 'zh-Hant': '落地窗', 'zh-Hans': '落地窗' },
-  playa: { en: 'Beach', es: 'Playa', 'zh-Hant': '海灘', 'zh-Hans': '海滩' },
-  espacio: { en: 'Outer space', es: 'Espacio', 'zh-Hant': '外太空', 'zh-Hans': '外太空' },
-  antartida: { en: 'Antarctica', es: 'Antártida', 'zh-Hant': '南極', 'zh-Hans': '南极' },
-  desierto: { en: 'Desert', es: 'Desierto', 'zh-Hant': '沙漠', 'zh-Hans': '沙漠' },
-  bosque: { en: 'Forest', es: 'Bosque', 'zh-Hant': '森林', 'zh-Hans': '森林' },
+  rotate: { en: 'A different one every day', es: 'Una distinta cada día', de: 'Jeden Tag ein anderes', 'zh-Hant': '每天換一個', 'zh-Hans': '每天换一个' },
+  estudio: { en: 'Study', es: 'Estudio', de: 'Arbeitszimmer', 'zh-Hant': '書房', 'zh-Hans': '书房' },
+  cocina: { en: 'Kitchen', es: 'Cocina', de: 'Küche', 'zh-Hant': '廚房', 'zh-Hans': '厨房' },
+  cabana: { en: 'Log cabin', es: 'Cabaña', de: 'Blockhütte', 'zh-Hant': '小木屋', 'zh-Hans': '小木屋' },
+  atico: { en: 'Attic', es: 'Ático', de: 'Dachboden', 'zh-Hant': '閣樓', 'zh-Hans': '阁楼' },
+  oficina: { en: 'Office', es: 'Oficina', de: 'Büro', 'zh-Hant': '辦公室', 'zh-Hans': '办公室' },
+  japonesa: { en: 'Japanese room', es: 'Habitación japonesa', de: 'Japanisches Zimmer', 'zh-Hant': '和室', 'zh-Hans': '和室' },
+  acuario: { en: 'Aquarium', es: 'Acuario', de: 'Aquarium', 'zh-Hant': '水族館', 'zh-Hans': '水族馆' },
+  arcade: { en: 'Arcade', es: 'Recreativos', de: 'Spielhalle', 'zh-Hant': '遊樂場', 'zh-Hans': '游戏厅' },
+  ventanal: { en: 'Picture window', es: 'Ventanal', de: 'Panoramafenster', 'zh-Hant': '落地窗', 'zh-Hans': '落地窗' },
+  playa: { en: 'Beach', es: 'Playa', de: 'Strand', 'zh-Hant': '海灘', 'zh-Hans': '海滩' },
+  espacio: { en: 'Outer space', es: 'Espacio', de: 'Weltraum', 'zh-Hant': '外太空', 'zh-Hans': '外太空' },
+  antartida: { en: 'Antarctica', es: 'Antártida', de: 'Antarktis', 'zh-Hant': '南極', 'zh-Hans': '南极' },
+  desierto: { en: 'Desert', es: 'Desierto', de: 'Wüste', 'zh-Hant': '沙漠', 'zh-Hans': '沙漠' },
+  bosque: { en: 'Forest', es: 'Bosque', de: 'Wald', 'zh-Hant': '森林', 'zh-Hans': '森林' },
 };
 
 /** Frames per second of the gestures: what the panel takes without dropping them. */
@@ -51,49 +51,52 @@ const COLUMN = { none: 'none', right: 'derecha', left: 'izquierda', alternate: '
 
 const roomOptions = t.object({
   room: t.enum(['rotate', ...ROOMS] as const, {
-    label: { en: 'Room', es: 'Habitación', 'zh-Hant': '房間', 'zh-Hans': '房间' },
-    help: { en: 'Indoors or out, each with its own window, lamp and floor.', es: 'Dentro o fuera, cada una con su ventana, su lámpara y su suelo.', 'zh-Hant': '室內或戶外，各有自己的窗戶、燈和地板。', 'zh-Hans': '室内或户外，各有自己的窗户、灯和地板。' },
+    label: { en: 'Room', es: 'Habitación', de: 'Zimmer', 'zh-Hant': '房間', 'zh-Hans': '房间' },
+    help: { en: 'Indoors or out, each with its own window, lamp and floor.', es: 'Dentro o fuera, cada una con su ventana, su lámpara y su suelo.', de: 'Drinnen oder draußen, jedes mit eigenem Fenster, eigener Lampe und eigenem Boden.', 'zh-Hant': '室內或戶外，各有自己的窗戶、燈和地板。', 'zh-Hans': '室内或户外，各有自己的窗户、灯和地板。' },
     labels: ROOM_LABELS,
   }),
   rooms: t.list(t.enum(ROOMS, { labels: ROOM_LABELS }), {
-    label: { en: 'Rooms to rotate through', es: 'Habitaciones por las que rotar', 'zh-Hant': '輪流使用的房間', 'zh-Hans': '轮换的房间' },
-    help: { en: 'With "A different one every day". Empty: all of them.', es: 'Con «Una distinta cada día». Vacío: todas.', 'zh-Hant': '搭配「每天換一個」使用。留空：全部。', 'zh-Hans': '配合“每天换一个”使用。留空：全部。' },
+    label: { en: 'Rooms to rotate through', es: 'Habitaciones por las que rotar', de: 'Zimmer im Wechsel', 'zh-Hant': '輪流使用的房間', 'zh-Hans': '轮换的房间' },
+    help: { en: 'With "A different one every day". Empty: all of them.', es: 'Con «Una distinta cada día». Vacío: todas.', de: 'Mit „Jeden Tag ein anderes“. Leer: alle.', 'zh-Hant': '搭配「每天換一個」使用。留空：全部。', 'zh-Hans': '配合“每天换一个”使用。留空：全部。' },
   }),
   projects: t.filter({
-    label: { en: 'Projects', es: 'Proyectos', 'zh-Hant': '專案', 'zh-Hans': '项目' },
+    label: { en: 'Projects', es: 'Proyectos', de: 'Projekte', 'zh-Hant': '專案', 'zh-Hans': '项目' },
     help: {
       en: 'Which sessions get a cat. Empty: all. Project, repository or folder names or patterns, comma-separated: * matches anything, a leading ! leaves out (web-app, acme-*, !scratch).',
       es: 'Qué sesiones tienen gato. Vacío: todas. Nombres o patrones de proyecto, repositorio o carpeta, separados por comas: * vale por cualquier cosa y un ! delante excluye (web-app, acme-*, !pruebas).',
+      de: 'Welche Sitzungen eine Katze bekommen. Leer: alle. Namen oder Muster von Projekten, Repositorys oder Ordnern, durch Kommas getrennt: * passt auf alles, ein ! davor schließt aus (web-app, acme-*, !test).',
       'zh-Hant': '哪些工作階段會有貓。留空：全部。填入專案、儲存庫或資料夾的名稱或模式，以逗號分隔：* 代表任意字元，開頭加 ! 則排除（web-app, acme-*, !scratch）。',
       'zh-Hans': '哪些会话会有猫。留空：全部。填写项目、仓库或文件夹的名称或模式，用逗号分隔：* 匹配任意内容，开头加 ! 表示排除（web-app, acme-*, !scratch）。',
     },
   }),
   column: t.enum(['none', 'right', 'left', 'alternate'] as const, {
-    label: { en: 'Strip without cats', es: 'Franja sin gatos', 'zh-Hant': '無貓區', 'zh-Hans': '无猫区' },
+    label: { en: 'Strip without cats', es: 'Franja sin gatos', de: 'Streifen ohne Katzen', 'zh-Hant': '無貓區', 'zh-Hans': '无猫区' },
     help: {
       en: 'Keeps a strip of the floor free, like the old card column. "Alternate" swaps sides now and then, against burn-in.',
       es: 'Deja libre una franja del suelo, como la antigua columna de tarjetas. «Alternar» cambia de lado cada cierto tiempo, contra el quemado.',
+      de: 'Hält einen Streifen des Bodens frei, wie die alte Kartenspalte. „Abwechselnd“ wechselt ab und zu die Seite, gegen Einbrennen.',
       'zh-Hant': '在地板上留出一條空白區，就像以前的卡片欄。「交替」會不時換邊，防止烙印。',
       'zh-Hans': '在地板上留出一条空白带，就像以前的卡片栏。“交替”会不时换边，防止烧屏。',
     },
     labels: {
-      none: { en: 'None', es: 'Ninguna', 'zh-Hant': '無', 'zh-Hans': '无' },
-      right: { en: 'Right', es: 'Derecha', 'zh-Hant': '右側', 'zh-Hans': '右侧' },
-      left: { en: 'Left', es: 'Izquierda', 'zh-Hant': '左側', 'zh-Hans': '左侧' },
-      alternate: { en: 'Alternate', es: 'Alternar', 'zh-Hant': '交替', 'zh-Hans': '交替' },
+      none: { en: 'None', es: 'Ninguna', de: 'Keiner', 'zh-Hant': '無', 'zh-Hans': '无' },
+      right: { en: 'Right', es: 'Derecha', de: 'Rechts', 'zh-Hant': '右側', 'zh-Hans': '右侧' },
+      left: { en: 'Left', es: 'Izquierda', de: 'Links', 'zh-Hant': '左側', 'zh-Hans': '左侧' },
+      alternate: { en: 'Alternate', es: 'Alternar', de: 'Abwechselnd', 'zh-Hant': '交替', 'zh-Hans': '交替' },
     },
   }),
   shelf: t.boolean({
     default: true,
-    label: { en: 'Week shelf', es: 'Estantería de la semana', 'zh-Hant': '本週書架', 'zh-Hans': '本周书架' },
+    label: { en: 'Week shelf', es: 'Estantería de la semana', de: 'Wochenregal', 'zh-Hant': '本週書架', 'zh-Hans': '本周书架' },
     help: {
       en: 'A cabinet at the back with a book per commit of yours this week and a binder per merged MR/PR. Read with git in the repos your sessions have been in.',
       es: 'Un mueble al fondo con un libro por cada commit tuyo de esta semana y un archivador por MR/PR fusionada. Se lee con git en los repos donde han estado tus sesiones.',
+      de: 'Ein Schrank im Hintergrund mit einem Buch pro Commit von dir in dieser Woche und einem Ordner pro gemergtem MR/PR. Gelesen mit git in den Repos, in denen deine Sitzungen waren.',
       'zh-Hant': '後方的書櫃：本週你的每個提交是一本書，每個已合併的 MR/PR 是一個資料夾。透過 git 讀取你的工作階段待過的儲存庫。',
       'zh-Hans': '后方的书柜：本周你的每个提交是一本书，每个已合并的 MR/PR 是一个文件夹。通过 git 读取你的会话待过的仓库。',
     },
   }),
-  swapSidesMs: t.duration({ default: 60 * 60_000, min: 60_000, label: { en: 'Swap sides every', es: 'Cambiar de lado cada', 'zh-Hant': '換邊間隔', 'zh-Hans': '换边间隔' }, advanced: true }),
+  swapSidesMs: t.duration({ default: 60 * 60_000, min: 60_000, label: { en: 'Swap sides every', es: 'Cambiar de lado cada', de: 'Seite wechseln alle', 'zh-Hant': '換邊間隔', 'zh-Hans': '换边间隔' }, advanced: true }),
 });
 
 type RoomOptions = (typeof roomOptions)['default'];
@@ -162,10 +165,11 @@ export function animationOf(a: AnimationFrame | undefined): Pick<SceneInput, 'an
 
 export const room = defineWidget({
   id: 'room',
-  name: { en: 'Cats room', es: 'Habitación de gatos', 'zh-Hant': '貓咪房間', 'zh-Hans': '猫咪房间' },
+  name: { en: 'Cats room', es: 'Habitación de gatos', de: 'Katzenzimmer', 'zh-Hant': '貓咪房間', 'zh-Hans': '猫咪房间' },
   description: {
     en: 'Each AI agent session is a cat in a room with the real sky outside: the ones that need you come forward, the ones working sit at their laptops in the back.',
     es: 'Cada sesión de un agente IA es un gato en una habitación con el cielo de verdad: los que te necesitan se acercan y los que trabajan se quedan al fondo con su portátil.',
+    de: 'Jede Sitzung eines KI-Agenten ist eine Katze in einem Zimmer mit dem echten Himmel draußen: Wer dich braucht, kommt nach vorn; wer arbeitet, sitzt hinten am Laptop.',
     'zh-Hant': '每個 AI 代理工作階段都是一隻貓，待在窗外是真實天空的房間裡：需要你的貓會走到前面，正在工作的則坐在後面對著筆電。',
     'zh-Hans': '每个 AI 智能体会话都是一只猫，待在窗外是真实天空的房间里：需要你的猫会走到前面，正在工作的则坐在后面对着笔记本电脑。',
   },
@@ -248,10 +252,11 @@ export const room = defineWidget({
 
 export const duel = defineInterlude({
   id: 'duel',
-  name: { en: 'Quarter-hour duel', es: 'Duelo del cuarto de hora', 'zh-Hant': '一刻鐘決鬥', 'zh-Hans': '一刻钟决斗' },
+  name: { en: 'Quarter-hour duel', es: 'Duelo del cuarto de hora', de: 'Viertelstunden-Duell', 'zh-Hant': '一刻鐘決鬥', 'zh-Hans': '一刻钟决斗' },
   description: {
     en: 'Two of your sessions fight it out with laser swords in the cats room. The one with fewer uncommitted files wins. With a single session, it fights the bug.',
     es: 'Dos de tus sesiones se baten con espadas láser en la habitación de los gatos. Gana la que tiene menos ficheros sin commit. Con una sola, se bate con el bug.',
+    de: 'Zwei deiner Sitzungen kämpfen im Katzenzimmer mit Laserschwertern. Wer weniger nicht committete Dateien hat, gewinnt. Mit nur einer Sitzung kämpft sie gegen den Bug.',
     'zh-Hant': '你的兩個工作階段在貓咪房間裡用光劍一決高下，未提交檔案較少的一方獲勝。只有一個工作階段時，就跟 bug 決鬥。',
     'zh-Hans': '你的两个会话在猫咪房间里用光剑一决高下，未提交文件较少的一方获胜。只有一个会话时，就跟 bug 决斗。',
   },
@@ -274,9 +279,9 @@ export const duel = defineInterlude({
 
 export default definePlugin({
   id: 'cats',
-  name: { en: 'Cats room', es: 'Habitación de gatos', 'zh-Hant': '貓咪房間', 'zh-Hans': '猫咪房间' },
+  name: { en: 'Cats room', es: 'Habitación de gatos', de: 'Katzenzimmer', 'zh-Hant': '貓咪房間', 'zh-Hans': '猫咪房间' },
   version: '0.2.1',
-  languages: ['en', 'es', 'zh-Hant', 'zh-Hans'],
+  languages: ['en', 'es', 'de', 'zh-Hant', 'zh-Hans'],
   sdk: '^0.2.0',
   permissions: { exec: ['git'] },
   requires: ['agents/sessions'],
@@ -284,6 +289,7 @@ export default definePlugin({
   description: {
     en: 'Your AI agent sessions as cats in a room: what needs you comes forward. From aimonitor.',
     es: 'Tus sesiones de agentes IA como gatos en una habitación: lo que te reclama se acerca. De aimonitor.',
+    de: 'Deine KI-Agenten-Sitzungen als Katzen in einem Zimmer: Was dich braucht, kommt nach vorn. Aus aimonitor.',
     'zh-Hant': '把你的 AI 代理工作階段變成房間裡的貓：需要你的會走到前面。來自 aimonitor。',
     'zh-Hans': '把你的 AI 智能体会话变成房间里的猫：需要你的会走到前面。来自 aimonitor。',
   },
@@ -295,7 +301,7 @@ export default definePlugin({
   templates: [
     {
       id: 'room',
-      name: { en: 'Cats room', es: 'Habitación de gatos', 'zh-Hant': '貓咪房間', 'zh-Hans': '猫咪房间' },
+      name: { en: 'Cats room', es: 'Habitación de gatos', de: 'Katzenzimmer', 'zh-Hant': '貓咪房間', 'zh-Hans': '猫咪房间' },
       icon: 'cat',
       wide: [
         { x: 0, y: 0, w: 7 / 10, h: 1, widgets: ['room'], chrome: 'bare' },

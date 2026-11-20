@@ -6,7 +6,7 @@
  */
 import { plural, type PluralForms } from '@kiosko/sdk';
 
-export type PropLang = 'es' | 'en' | 'zh-Hant' | 'zh-Hans';
+export type PropLang = 'es' | 'en' | 'de' | 'zh-Hant' | 'zh-Hans';
 
 /** `{n} …` in `lang`, with its plural rules. */
 const count = (lang: PropLang, forms: PluralForms) => (n: number) => plural(n, { [lang]: forms }, lang);
@@ -155,6 +155,52 @@ export const EN: PropTexts = {
   thisWeek: (n, rest) => (rest > 0 ? `this week: ${n} (+${rest})` : `this week: ${n}`),
 };
 
+export const DE: PropTexts = {
+  id: 'de',
+  bump: 'bonk!',
+  notLikeThat: 'nicht so, junger Mann',
+  clonk: 'klonk!',
+  outOfMemory: 'Speicher voll!',
+  boom: 'bumm!',
+  fail: 'Fehler!',
+  conflict: 'KONFLIKT!',
+  slam: 'ZACK!',
+  meow: 'miau!',
+  crunch: 'knusper!',
+  you: 'du!',
+  yum: 'mampf!',
+  yumYum: 'mampf… mampf…',
+  seeQuestion: 'siehste?',
+  eureka: 'Heureka!',
+  out: 'raus!',
+  crack: 'knack!',
+  buildOk: 'Build OK!',
+  click: 'klick!',
+  ouch: 'AUA!',
+  toProduction: 'ab in Produktion!',
+  poof: 'PUFF!',
+  fsshh: 'FSSSCHH!',
+  oops: 'hoppla!',
+  bookTitle1: 'Wie werde',
+  bookTitle2: 'ich Katze?',
+  bookTitle3: 'für Dummies',
+  moreLines: '+500 Zeilen…',
+  blah: 'bla, bla…',
+  andThen: 'und dann…',
+  years: count('de', { one: '{n} Jahr!', other: '{n} Jahre!' }),
+  weekendIn: (day) => `…am ${day}`,
+  packages: count('de', { one: '+{n} Paket', other: '+{n} Pakete' }),
+  files: count('de', { one: '×{n} Datei', other: '×{n} Dateien' }),
+  subagents: count('de', { one: '×{n} Subagent', other: '×{n} Subagenten' }),
+  contextCompacted: 'Kontext komprimiert',
+  piece: (n, of) => `Teil ${n} / ${of}`,
+  boxPieces: (number, pieces) => `18+   ${number}   ${pieces} Teile`,
+  finishedModel: (name, number, pieces, w) => `${name} (${number}) · ${pieces} Teile · ${w} cm`,
+  whichPiece: 'und dieses Teil?',
+  finished: 'fertig!',
+  thisWeek: (n, rest) => (rest > 0 ? `diese Woche: ${n} (+${rest})` : `diese Woche: ${n}`),
+};
+
 export const ZH_HANT: PropTexts = {
   id: 'zh-Hant',
   bump: '碰！',
@@ -247,7 +293,7 @@ export const ZH_HANS: PropTexts = {
   thisWeek: (n, rest) => (rest > 0 ? `本周：${n}（+${rest}）` : `本周：${n}`),
 };
 
-const TABLES: Record<PropLang, PropTexts> = { es: ES, en: EN, 'zh-Hant': ZH_HANT, 'zh-Hans': ZH_HANS };
+const TABLES: Record<PropLang, PropTexts> = { es: ES, en: EN, de: DE, 'zh-Hant': ZH_HANT, 'zh-Hans': ZH_HANS };
 
 export function propTextsFor(language: PropLang): PropTexts {
   return TABLES[language] ?? ES;
