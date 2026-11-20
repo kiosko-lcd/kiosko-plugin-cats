@@ -622,7 +622,7 @@ export function renderScene(input: SceneInput): Canvas {
   }
   const L = layoutScene(input.sessions, now, layoutConfig(options), v.W, columnWidth(options), v.x0);
   // The cabinet stands behind everyone, far from the clock, and moves aside if the strip reaches it.
-  drawCabinet(ctx, Math.min(RW - RIGHT_ZONE - SHELF_W - 230, L.zone.hi - SHELF_W - 30), floorAt(1), input.shelf ?? null, lightLevel(sky) === 0, words.week, input.trophies ?? []);
+  drawCabinet(ctx, Math.min(RW - RIGHT_ZONE - SHELF_W - 230, L.zone.hi - SHELF_W - 30), floorAt(1), input.shelf ?? null, lightLevel(sky) === 0, words, input.trophies ?? []);
   const party = partyTime(now);
   const spooky = spookyDay(now);
   const flavor = `${nightOwl(now) ? 'n' : ''}${spooky ? 'f' : ''}`;

@@ -39,6 +39,12 @@ test('prop-texts: the functions return strings with their numbers', () => {
   }
   assert.equal(ES.years(1), '¡1 año!');
   assert.equal(EN.years(2), '2 years!');
+  assert.equal(EN.years(1), '1 year!');
+  assert.equal(EN.files(1), '×1 file');
+  assert.equal(ES.subagents(1), '×1 subagente');
+  assert.equal(ES.packages(274), '+274 paquetes');
+  assert.equal(propTextsFor('zh-Hant').files(3), '×3 個檔案');
+  assert.equal(propTextsFor('zh-Hans').years(2), '2 岁了！');
 });
 
 test('prop-texts: no Spanish literals are left in props.ts or lego.ts', () => {

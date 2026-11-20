@@ -4,7 +4,12 @@
  * synchronously during the render, so a module-level state that the scene sets
  * before painting is enough. Spanish is the original and the default.
  */
+import { plural, type PluralForms } from '@kiosko/sdk';
+
 export type PropLang = 'es' | 'en' | 'zh-Hant' | 'zh-Hans';
+
+/** `{n} …` in `lang`, with its plural rules. */
+const count = (lang: PropLang, forms: PluralForms) => (n: number) => plural(n, { [lang]: forms }, lang);
 
 export interface PropTexts {
   /** Language of this table: part of the key of anything cached with text painted in. */
@@ -90,11 +95,11 @@ export const ES: PropTexts = {
   moreLines: '+500 líneas…',
   blah: 'bla, bla…',
   andThen: 'y entonces…',
-  years: (n) => `¡${n} año${n === 1 ? '' : 's'}!`,
+  years: count('es', { one: '¡{n} año!', other: '¡{n} años!' }),
   weekendIn: (day) => `…en ${day}`,
-  packages: (n) => `+${n} paquetes`,
-  files: (n) => `×${n} ficheros`,
-  subagents: (n) => `×${n} subagentes`,
+  packages: count('es', { one: '+{n} paquete', other: '+{n} paquetes' }),
+  files: count('es', { one: '×{n} fichero', other: '×{n} ficheros' }),
+  subagents: count('es', { one: '×{n} subagente', other: '×{n} subagentes' }),
   contextCompacted: 'contexto compactado',
   piece: (n, of) => `pieza ${n} / ${of}`,
   boxPieces: (number, pieces) => `18+   ${number}   ${pieces} pzs`,
@@ -136,11 +141,11 @@ export const EN: PropTexts = {
   moreLines: '+500 lines…',
   blah: 'blah, blah…',
   andThen: 'and then…',
-  years: (n) => `${n} year${n === 1 ? '' : 's'}!`,
+  years: count('en', { one: '{n} year!', other: '{n} years!' }),
   weekendIn: (day) => `…on ${day}`,
-  packages: (n) => `+${n} packages`,
-  files: (n) => `×${n} files`,
-  subagents: (n) => `×${n} subagents`,
+  packages: count('en', { one: '+{n} package', other: '+{n} packages' }),
+  files: count('en', { one: '×{n} file', other: '×{n} files' }),
+  subagents: count('en', { one: '×{n} subagent', other: '×{n} subagents' }),
   contextCompacted: 'context compacted',
   piece: (n, of) => `piece ${n} / ${of}`,
   boxPieces: (number, pieces) => `18+   ${number}   ${pieces} pcs`,
@@ -182,11 +187,11 @@ export const ZH_HANT: PropTexts = {
   moreLines: '+500 行…',
   blah: '巴拉巴拉…',
   andThen: '然後呢…',
-  years: (n) => `${n} 歲了！`,
+  years: count('zh-Hant', { other: '{n} 歲了！' }),
   weekendIn: (day) => `…${day}見`,
-  packages: (n) => `+${n} 個套件`,
-  files: (n) => `×${n} 個檔案`,
-  subagents: (n) => `×${n} 個子代理`,
+  packages: count('zh-Hant', { other: '+{n} 個套件' }),
+  files: count('zh-Hant', { other: '×{n} 個檔案' }),
+  subagents: count('zh-Hant', { other: '×{n} 個子代理' }),
   contextCompacted: '上下文已壓縮',
   piece: (n, of) => `第 ${n} / ${of} 塊`,
   boxPieces: (number, pieces) => `18+   ${number}   ${pieces} 片`,
@@ -228,11 +233,11 @@ export const ZH_HANS: PropTexts = {
   moreLines: '+500 行…',
   blah: '巴拉巴拉…',
   andThen: '然后呢…',
-  years: (n) => `${n} 岁了！`,
+  years: count('zh-Hans', { other: '{n} 岁了！' }),
   weekendIn: (day) => `…${day}见`,
-  packages: (n) => `+${n} 个包`,
-  files: (n) => `×${n} 个文件`,
-  subagents: (n) => `×${n} 个子智能体`,
+  packages: count('zh-Hans', { other: '+{n} 个包' }),
+  files: count('zh-Hans', { other: '×{n} 个文件' }),
+  subagents: count('zh-Hans', { other: '×{n} 个子智能体' }),
   contextCompacted: '上下文已压缩',
   piece: (n, of) => `第 ${n} / ${of} 块`,
   boxPieces: (number, pieces) => `18+   ${number}   ${pieces} 片`,

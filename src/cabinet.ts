@@ -46,17 +46,25 @@ function volume(c: X, x: number, base: number, repo: string, i: number, mr: bool
   return w;
 }
 
+/** The words of the plate: "wk" and "{n} commits" in the panel's language. */
+export interface PlateWords {
+  week: string;
+  commits: (n: number) => string;
+}
+
+const PLATE_EN: PlateWords = { week: 'wk', commits: (n) => `${n} commit${n === 1 ? '' : 's'}` };
+
 /** The plate's text: week number and count. */
-export function shelfLabel(shelf: ShelfView, weekWord: string): string {
+export function shelfLabel(shelf: ShelfView, words: PlateWords = PLATE_EN): string {
   const now = shelf.weeks[shelf.weeks.length - 1] ?? { commits: 0, mrs: 0 };
-  return `${weekWord} ${shelf.week} · ${now.commits} commit${now.commits === 1 ? '' : 's'}${now.mrs ? ` · ${now.mrs} MR` : ''}`;
+  return `${words.week} ${shelf.week} · ${words.commits(now.commits)}${now.mrs ? ` · ${now.mrs} MR` : ''}`;
 }
 
 /**
  * The cabinet with everything, standing on the floor at the back; (x, y) is
  * the bottom left corner. Without a shelf it isn't painted.
  */
-export function drawCabinet(c: X, x: number, y: number, shelf: ShelfView | null, night: boolean, weekWord = 'wk', trophies: string[] = []): void {
+export function drawCabinet(c: X, x: number, y: number, shelf: ShelfView | null, night: boolean, words: PlateWords = PLATE_EN, trophies: string[] = []): void {
   if (!shelf && !trophies.length) return;
   const W = SHELF_W, top = y - CABINET_H;
   c.save();
@@ -80,14 +88,14 @@ export function drawCabinet(c: X, x: number, y: number, shelf: ShelfView | null,
   c.fillStyle = edge;
   c.fillRect(x, y - KICK + BOARD, W, KICK - BOARD);
   // The books: the lower shelf first, then the upper one.
-  if (shelf) drawShelf(c, x, y, W, baseA, baseB, shelf, night, weekWord);
+  if (shelf) drawShelf(c, x, y, W, baseA, baseB, shelf, night, words);
   // On top, the LEGO sets built this week.
   if (trophies.length) trophyMinis(c, trophies, x, top, night);
   c.restore();
 }
 
 /** The week's work: books and binders on the two shelves, and the plate on the plinth. */
-function drawShelf(c: X, x: number, y: number, W: number, baseA: number, baseB: number, shelf: ShelfView, night: boolean, weekWord: string): void {
+function drawShelf(c: X, x: number, y: number, W: number, baseA: number, baseB: number, shelf: ShelfView, night: boolean, words: PlateWords): void {
   const inner = W - 16;
   let row = 0, cx = 0, shown = 0;
   for (const [i, b] of shelf.books.entries()) {
@@ -110,7 +118,7 @@ function drawShelf(c: X, x: number, y: number, W: number, baseA: number, baseB: 
   // The plate: week and count, and the little bars of the last weeks.
   c.fillStyle = night ? '#C9B98F' : '#F3E3B5';
   c.textAlign = 'left';
-  c.fillText(shelfLabel(shelf, weekWord), x + 9, y - 3);
+  c.fillText(shelfLabel(shelf, words), x + 9, y - 3);
   const max = Math.max(1, ...shelf.weeks.map((w) => w.commits + w.mrs));
   shelf.weeks.forEach((w, i) => {
     const h = Math.max(1, Math.round(((w.commits + w.mrs) / max) * (KICK - BOARD - 3)));

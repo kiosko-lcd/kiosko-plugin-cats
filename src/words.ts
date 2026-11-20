@@ -3,8 +3,11 @@
  * meeting door, floor tags), in the user's language. Spanish is the original;
  * Chinese comes in Traditional and Simplified; anything else falls back to English.
  */
-import type { Formatters, Localized } from '@kiosko/sdk';
+import { plural, type BaseContext, type PluralForms } from '@kiosko/sdk';
 import type { PropLang } from './prop-texts.ts';
+
+/** `{n} …` in `lang`, with its plural rules: for the count texts of a table kept per language. */
+const count = (lang: PropLang, forms: PluralForms) => (n: number) => plural(n, { [lang]: forms }, lang);
 
 export interface Words {
   /** Language of the table, for the texts painted inside the props. */
@@ -22,6 +25,8 @@ export interface Words {
   more: string;
   /** Abbreviated "week", for the plate of the shelf ("wk 46"). */
   week: string;
+  /** The count on that plate: "12 commits". */
+  commits: (n: number) => string;
   /** Texts of the gestures: the cat's reactions and the little signs they hold. */
   gameOver: string;
   gameWin: string;
@@ -69,6 +74,7 @@ const ES: Table = {
   inTime: (t) => `en ${t}`,
   more: 'más',
   week: 'sem.',
+  commits: count('es', { one: '{n} commit', other: '{n} commits' }),
   gameOver: '¡nooo!',
   gameWin: '¡bien!',
   detachedHead: 'HEAD separado',
@@ -91,7 +97,7 @@ const ES: Table = {
   wins: (n) => `Gana ${n}`,
   theBug: 'el bug',
   bugHadNoChance: 'el bug no tenía nada que hacer',
-  uncommittedFiles: (n) => `${n === 0 ? 'ningún fichero' : n === 1 ? 'un fichero' : `${n} ficheros`} sin commit`,
+  uncommittedFiles: (n) => (n === 0 ? 'ningún fichero sin commit' : count('es', { one: 'un fichero sin commit', other: '{n} ficheros sin commit' })(n)),
   onPoints: 'a los puntos',
 };
 
@@ -105,6 +111,7 @@ const EN: Table = {
   inTime: (t) => `in ${t}`,
   more: 'more',
   week: 'wk',
+  commits: count('en', { one: '{n} commit', other: '{n} commits' }),
   gameOver: 'nooo!',
   gameWin: 'yes!',
   detachedHead: 'detached HEAD',
@@ -127,7 +134,7 @@ const EN: Table = {
   wins: (n) => `${n} wins`,
   theBug: 'the bug',
   bugHadNoChance: 'the bug never stood a chance',
-  uncommittedFiles: (n) => `${n === 0 ? 'no' : n === 1 ? 'one' : n} uncommitted file${n === 1 ? '' : 's'}`,
+  uncommittedFiles: (n) => (n === 0 ? 'no uncommitted files' : count('en', { one: 'one uncommitted file', other: '{n} uncommitted files' })(n)),
   onPoints: 'on points',
 };
 
@@ -141,6 +148,7 @@ const ZH_HANT: Table = {
   inTime: (t) => `${t}後`,
   more: '還有',
   week: '週',
+  commits: count('zh-Hant', { other: '{n} 次提交' }),
   gameOver: '不——！',
   gameWin: '耶！',
   detachedHead: '分離的 HEAD',
@@ -163,7 +171,7 @@ const ZH_HANT: Table = {
   wins: (n) => `${n} 獲勝`,
   theBug: 'bug',
   bugHadNoChance: 'bug 毫無勝算',
-  uncommittedFiles: (n) => (n === 0 ? '沒有未提交的檔案' : `${n} 個未提交的檔案`),
+  uncommittedFiles: (n) => (n === 0 ? '沒有未提交的檔案' : count('zh-Hant', { other: '{n} 個未提交的檔案' })(n)),
   onPoints: '點數獲勝',
 };
 
@@ -177,6 +185,7 @@ const ZH_HANS: Table = {
   inTime: (t) => `${t}后`,
   more: '还有',
   week: '周',
+  commits: count('zh-Hans', { other: '{n} 次提交' }),
   gameOver: '不——！',
   gameWin: '耶！',
   detachedHead: '游离的 HEAD',
@@ -199,18 +208,18 @@ const ZH_HANS: Table = {
   wins: (n) => `${n} 获胜`,
   theBug: 'bug',
   bugHadNoChance: 'bug 毫无胜算',
-  uncommittedFiles: (n) => (n === 0 ? '没有未提交的文件' : `${n} 个未提交的文件`),
+  uncommittedFiles: (n) => (n === 0 ? '没有未提交的文件' : count('zh-Hans', { other: '{n} 个未提交的文件' })(n)),
   onPoints: '点数获胜',
 };
 
 const TABLES: Record<PropLang, Table> = { es: ES, en: EN, 'zh-Hant': ZH_HANT, 'zh-Hans': ZH_HANS };
 
 /**
- * The words in the panel's language, picked with `ctx.t` (so a language
- * without a table gets English), with times through `ctx.fmt`.
+ * The words in the panel's language, picked with `ctx.pickLanguage` (so a
+ * language without a table gets English), with times through `ctx.fmt`.
  */
-export function wordsFor(ctx: { t: (text: Localized) => string; fmt: Formatters }): Words {
-  const table = TABLES[ctx.t({ en: 'en', es: 'es', 'zh-Hant': 'zh-Hant', 'zh-Hans': 'zh-Hans' }) as PropLang] ?? EN;
+export function wordsFor(ctx: Pick<BaseContext, 'pickLanguage' | 'fmt'>): Words {
+  const table = TABLES[ctx.pickLanguage(Object.keys(TABLES)) as PropLang] ?? EN;
   return {
     ...table,
     elapsed: (ms) => (ms < 60_000 ? table.now : ctx.fmt.duration(ms)),

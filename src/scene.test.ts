@@ -181,3 +181,11 @@ test('trophies: the cabinet shows the built sets even without a shelf, and nothi
   assert.notDeepEqual(trophies, none);
   assert.deepEqual(renderScene(input(sessions, { trophies: [] })).toBuffer('image/png'), none);
 });
+
+test('cabinet plate: week and commits in the panel language', async () => {
+  const { shelfLabel } = await import('./cabinet.ts');
+  const shelf = { week: 46, weeks: [{ commits: 1, mrs: 0 }] } as unknown as Parameters<typeof shelfLabel>[0];
+  assert.equal(shelfLabel(shelf), 'wk 46 · 1 commit');
+  assert.equal(shelfLabel(shelf, wordsIn('es')), 'sem. 46 · 1 commit');
+  assert.equal(shelfLabel({ ...shelf, weeks: [{ commits: 7, mrs: 2 }] } as typeof shelf, wordsIn('zh-TW')), '週 46 · 7 次提交 · 2 MR');
+});
