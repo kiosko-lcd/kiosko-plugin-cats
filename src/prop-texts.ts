@@ -4,9 +4,16 @@
  * synchronously during the render, so a module-level state that the scene sets
  * before painting is enough. Spanish is the original and the default.
  */
+import { plural, type PluralForms } from '@kiosko/sdk';
+
+export type PropLang = 'es' | 'en' | 'zh-Hant' | 'zh-Hans';
+
+/** `{n} …` in `lang`, with its plural rules. */
+const count = (lang: PropLang, forms: PluralForms) => (n: number) => plural(n, { [lang]: forms }, lang);
+
 export interface PropTexts {
   /** Language of this table: part of the key of anything cached with text painted in. */
-  id: 'es' | 'en';
+  id: PropLang;
   // Gesture bubbles.
   bump: string;
   notLikeThat: string;
@@ -88,11 +95,11 @@ export const ES: PropTexts = {
   moreLines: '+500 líneas…',
   blah: 'bla, bla…',
   andThen: 'y entonces…',
-  years: (n) => `¡${n} año${n === 1 ? '' : 's'}!`,
+  years: count('es', { one: '¡{n} año!', other: '¡{n} años!' }),
   weekendIn: (day) => `…en ${day}`,
-  packages: (n) => `+${n} paquetes`,
-  files: (n) => `×${n} ficheros`,
-  subagents: (n) => `×${n} subagentes`,
+  packages: count('es', { one: '+{n} paquete', other: '+{n} paquetes' }),
+  files: count('es', { one: '×{n} fichero', other: '×{n} ficheros' }),
+  subagents: count('es', { one: '×{n} subagente', other: '×{n} subagentes' }),
   contextCompacted: 'contexto compactado',
   piece: (n, of) => `pieza ${n} / ${of}`,
   boxPieces: (number, pieces) => `18+   ${number}   ${pieces} pzs`,
@@ -134,11 +141,11 @@ export const EN: PropTexts = {
   moreLines: '+500 lines…',
   blah: 'blah, blah…',
   andThen: 'and then…',
-  years: (n) => `${n} year${n === 1 ? '' : 's'}!`,
+  years: count('en', { one: '{n} year!', other: '{n} years!' }),
   weekendIn: (day) => `…on ${day}`,
-  packages: (n) => `+${n} packages`,
-  files: (n) => `×${n} files`,
-  subagents: (n) => `×${n} subagents`,
+  packages: count('en', { one: '+{n} package', other: '+{n} packages' }),
+  files: count('en', { one: '×{n} file', other: '×{n} files' }),
+  subagents: count('en', { one: '×{n} subagent', other: '×{n} subagents' }),
   contextCompacted: 'context compacted',
   piece: (n, of) => `piece ${n} / ${of}`,
   boxPieces: (number, pieces) => `18+   ${number}   ${pieces} pcs`,
@@ -148,8 +155,102 @@ export const EN: PropTexts = {
   thisWeek: (n, rest) => (rest > 0 ? `this week: ${n} (+${rest})` : `this week: ${n}`),
 };
 
-export function propTextsFor(language: 'es' | 'en'): PropTexts {
-  return language === 'en' ? EN : ES;
+export const ZH_HANT: PropTexts = {
+  id: 'zh-Hant',
+  bump: '碰！',
+  notLikeThat: '年輕人，不是這樣',
+  clonk: '叩！',
+  outOfMemory: '記憶體不足！',
+  boom: '砰！',
+  fail: '失敗！',
+  conflict: '衝突！',
+  slam: '啪！',
+  meow: '喵！',
+  crunch: '喀滋！',
+  you: '就是你！',
+  yum: '好吃！',
+  yumYum: '嚼… 嚼…',
+  seeQuestion: '看吧？',
+  eureka: '找到了！',
+  out: '出去！',
+  crack: '喀！',
+  buildOk: '建置成功！',
+  click: '喀嚓！',
+  ouch: '好痛！',
+  toProduction: '上線！',
+  poof: '噗！',
+  fsshh: '嘶嘶嘶！',
+  oops: '哎呀！',
+  bookTitle1: '貓咪',
+  bookTitle2: '入門',
+  bookTitle3: '傻瓜書',
+  moreLines: '+500 行…',
+  blah: '巴拉巴拉…',
+  andThen: '然後呢…',
+  years: count('zh-Hant', { other: '{n} 歲了！' }),
+  weekendIn: (day) => `…${day}見`,
+  packages: count('zh-Hant', { other: '+{n} 個套件' }),
+  files: count('zh-Hant', { other: '×{n} 個檔案' }),
+  subagents: count('zh-Hant', { other: '×{n} 個子代理' }),
+  contextCompacted: '上下文已壓縮',
+  piece: (n, of) => `第 ${n} / ${of} 塊`,
+  boxPieces: (number, pieces) => `18+   ${number}   ${pieces} 片`,
+  finishedModel: (name, number, pieces, w) => `${name}（${number}）· ${pieces} 片 · ${w} 公分`,
+  whichPiece: '這塊放哪？',
+  finished: '完成！',
+  thisWeek: (n, rest) => (rest > 0 ? `本週：${n}（+${rest}）` : `本週：${n}`),
+};
+
+export const ZH_HANS: PropTexts = {
+  id: 'zh-Hans',
+  bump: '碰！',
+  notLikeThat: '年轻人，不是这样',
+  clonk: '咚！',
+  outOfMemory: '内存不足！',
+  boom: '砰！',
+  fail: '失败！',
+  conflict: '冲突！',
+  slam: '啪！',
+  meow: '喵！',
+  crunch: '咔嚓！',
+  you: '就是你！',
+  yum: '好吃！',
+  yumYum: '吧唧… 吧唧…',
+  seeQuestion: '看吧？',
+  eureka: '找到了！',
+  out: '出去！',
+  crack: '咔！',
+  buildOk: '构建成功！',
+  click: '咔哒！',
+  ouch: '好痛！',
+  toProduction: '上线！',
+  poof: '噗！',
+  fsshh: '嘶嘶嘶！',
+  oops: '哎呀！',
+  bookTitle1: '猫咪',
+  bookTitle2: '入门',
+  bookTitle3: '傻瓜书',
+  moreLines: '+500 行…',
+  blah: '巴拉巴拉…',
+  andThen: '然后呢…',
+  years: count('zh-Hans', { other: '{n} 岁了！' }),
+  weekendIn: (day) => `…${day}见`,
+  packages: count('zh-Hans', { other: '+{n} 个包' }),
+  files: count('zh-Hans', { other: '×{n} 个文件' }),
+  subagents: count('zh-Hans', { other: '×{n} 个子智能体' }),
+  contextCompacted: '上下文已压缩',
+  piece: (n, of) => `第 ${n} / ${of} 块`,
+  boxPieces: (number, pieces) => `18+   ${number}   ${pieces} 片`,
+  finishedModel: (name, number, pieces, w) => `${name}（${number}）· ${pieces} 片 · ${w} 厘米`,
+  whichPiece: '这块放哪？',
+  finished: '完成！',
+  thisWeek: (n, rest) => (rest > 0 ? `本周：${n}（+${rest}）` : `本周：${n}`),
+};
+
+const TABLES: Record<PropLang, PropTexts> = { es: ES, en: EN, 'zh-Hant': ZH_HANT, 'zh-Hans': ZH_HANS };
+
+export function propTextsFor(language: PropLang): PropTexts {
+  return TABLES[language] ?? ES;
 }
 
 let current: PropTexts = ES;

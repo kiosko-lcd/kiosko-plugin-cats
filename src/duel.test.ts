@@ -83,3 +83,16 @@ test('duel: frames paint at the panel size', () => {
   for (const i of [0, Math.floor(p.frames / 2), p.frames - 1]) p.draw(c.getContext('2d'), i);
   assert.deepEqual([...c.toBuffer('image/jpeg').subarray(0, 2)], [0xff, 0xd8]);
 });
+
+test('words: picked by language, counts with their plural forms', () => {
+  assert.equal(wordsIn('en').uncommittedFiles(0), 'no uncommitted files');
+  assert.equal(wordsIn('en').uncommittedFiles(1), 'one uncommitted file');
+  assert.equal(wordsIn('en').uncommittedFiles(4), '4 uncommitted files');
+  assert.equal(wordsIn('es-ES').uncommittedFiles(1), 'un fichero sin commit');
+  assert.equal(wordsIn('es').uncommittedFiles(3), '3 ficheros sin commit');
+  assert.equal(wordsIn('zh-TW').uncommittedFiles(3), '3 個未提交的檔案');
+  assert.equal(wordsIn('zh-CN').commits(5), '5 次提交');
+  assert.equal(wordsIn('en').commits(1), '1 commit');
+  assert.equal(wordsIn('de').lang, 'en', 'any other language: English');
+  assert.equal(wordsIn('zh-HK').lang, 'zh-Hant');
+});
