@@ -23,8 +23,8 @@ export interface Words {
   inTime: (t: string) => string;
   /** "+3 more" tag when not every cat fits. */
   more: string;
-  /** Abbreviated "week", for the plate of the shelf ("wk 46"). */
-  week: string;
+  /** The week number on the plate of the shelf ("wk 46", "第 46 週"). */
+  week: (n: number) => string;
   /** The count on that plate: "12 commits". */
   commits: (n: number) => string;
   /** Texts of the gestures: the cat's reactions and the little signs they hold. */
@@ -73,7 +73,7 @@ const ES: Table = {
   now: 'ahora',
   inTime: (t) => `en ${t}`,
   more: 'más',
-  week: 'sem.',
+  week: (n) => `sem. ${n}`,
   commits: count('es', { one: '{n} commit', other: '{n} commits' }),
   gameOver: '¡nooo!',
   gameWin: '¡bien!',
@@ -110,7 +110,7 @@ const EN: Table = {
   now: 'now',
   inTime: (t) => `in ${t}`,
   more: 'more',
-  week: 'wk',
+  week: (n) => `wk ${n}`,
   commits: count('en', { one: '{n} commit', other: '{n} commits' }),
   gameOver: 'nooo!',
   gameWin: 'yes!',
@@ -147,7 +147,7 @@ const ZH_HANT: Table = {
   now: '現在',
   inTime: (t) => `${t}後`,
   more: '還有',
-  week: '週',
+  week: (n) => `第 ${n} 週`,
   commits: count('zh-Hant', { other: '{n} 次提交' }),
   gameOver: '不——！',
   gameWin: '耶！',
@@ -184,7 +184,7 @@ const ZH_HANS: Table = {
   now: '现在',
   inTime: (t) => `${t}后`,
   more: '还有',
-  week: '周',
+  week: (n) => `第 ${n} 周`,
   commits: count('zh-Hans', { other: '{n} 次提交' }),
   gameOver: '不——！',
   gameWin: '耶！',

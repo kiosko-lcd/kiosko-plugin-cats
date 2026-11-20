@@ -48,16 +48,16 @@ function volume(c: X, x: number, base: number, repo: string, i: number, mr: bool
 
 /** The words of the plate: "wk" and "{n} commits" in the panel's language. */
 export interface PlateWords {
-  week: string;
+  week: (n: number) => string;
   commits: (n: number) => string;
 }
 
-const PLATE_EN: PlateWords = { week: 'wk', commits: (n) => `${n} commit${n === 1 ? '' : 's'}` };
+const PLATE_EN: PlateWords = { week: (n) => `wk ${n}`, commits: (n) => `${n} commit${n === 1 ? '' : 's'}` };
 
 /** The plate's text: week number and count. */
 export function shelfLabel(shelf: ShelfView, words: PlateWords = PLATE_EN): string {
   const now = shelf.weeks[shelf.weeks.length - 1] ?? { commits: 0, mrs: 0 };
-  return `${words.week} ${shelf.week} · ${words.commits(now.commits)}${now.mrs ? ` · ${now.mrs} MR` : ''}`;
+  return `${words.week(shelf.week)} · ${words.commits(now.commits)}${now.mrs ? ` · ${now.mrs} MR` : ''}`;
 }
 
 /**
