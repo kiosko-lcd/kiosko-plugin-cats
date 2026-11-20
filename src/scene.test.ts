@@ -161,6 +161,7 @@ test('words: the panel language through ctx.t, times through ctx.fmt', () => {
   assert.equal(wordsIn('es').elapsed(30_000), 'ahora');
   assert.equal(wordsIn('en').elapsed(65 * MIN), '1 h 05');
   assert.equal(wordsIn('es').inTime(wordsIn('es').countdown(4 * MIN + 1_000)), 'en 5 min');
+  assert.equal(wordsIn('de').mayI, 'DARF ICH?');
 });
 
 test('shelf: the cabinet paints books only when there is a shelf, and the scene stays the same size', () => {

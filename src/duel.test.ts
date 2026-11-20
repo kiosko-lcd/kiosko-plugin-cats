@@ -93,6 +93,8 @@ test('words: picked by language, counts with their plural forms', () => {
   assert.equal(wordsIn('zh-TW').uncommittedFiles(3), '3 個未提交的檔案');
   assert.equal(wordsIn('zh-CN').commits(5), '5 次提交');
   assert.equal(wordsIn('en').commits(1), '1 commit');
-  assert.equal(wordsIn('de').lang, 'en', 'any other language: English');
+  assert.equal(wordsIn('de-AT').uncommittedFiles(1), 'eine offene Datei');
+  assert.equal(wordsIn('de').uncommittedFiles(3), '3 offene Dateien');
+  assert.equal(wordsIn('fr').lang, 'en', 'any other language: English');
   assert.equal(wordsIn('zh-HK').lang, 'zh-Hant');
 });
