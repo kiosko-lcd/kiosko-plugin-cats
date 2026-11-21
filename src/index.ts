@@ -138,12 +138,23 @@ function demoSession(now: number, id: string, project: string, state: SessionVie
   };
 }
 
-export function demoSessions(now: number): SessionView[] {
+/** Simplified Chinese reads mainland China, where Claude and Gemini are not offered: its demo shows agents used there. */
+const MAINLAND = /^zh-(hans|cn|sg)\b/i;
+
+export function demoSessions(now: number, locale = 'en'): SessionView[] {
+  if (MAINLAND.test(locale) || /^zh$/i.test(locale)) {
+    return [
+      demoSession(now, 'demo-api-7f3a', 'api', 'permission', 2, { provider: 'qwen', detail: 'run_shell_command: npm publish', event: 'PermissionRequest' }),
+      demoSession(now, 'demo-web-1c9e', 'web-app', 'waiting', 6, { provider: 'kimi', event: 'Stop' }),
+      demoSession(now, 'demo-infra-8c07', 'infra', 'active', 18, { provider: 'qwen', detail: 'edit: modules/network/main.tf', duck: true }),
+      demoSession(now, 'demo-docs-9d11', 'docs', 'ready', 9, { provider: 'iflow', event: 'Stop' }),
+    ];
+  }
   return [
     demoSession(now, 'demo-api-7f3a', 'api', 'permission', 2, { detail: 'Bash: npm publish', event: 'PermissionRequest' }),
-    demoSession(now, 'demo-web-1c9e', 'web-app', 'waiting', 6, { event: 'Stop' }),
+    demoSession(now, 'demo-web-1c9e', 'web-app', 'waiting', 6, { provider: 'codex', event: 'Stop' }),
     demoSession(now, 'demo-infra-8c07', 'infra', 'active', 18, { detail: 'Edit: modules/network/main.tf', duck: true }),
-    demoSession(now, 'demo-docs-9d11', 'docs', 'ready', 9, { event: 'Stop' }),
+    demoSession(now, 'demo-docs-9d11', 'docs', 'ready', 9, { provider: 'gemini', event: 'Stop' }),
   ];
 }
 
@@ -175,7 +186,7 @@ export const room = defineWidget({
   },
   icon: 'cat',
   category: 'scene',
-  tags: ['agents', 'claude', 'gemini', 'illustration'],
+  tags: ['agents', 'claude', 'gemini', 'codex', 'qwen', 'kimi', 'illustration'],
   chrome: 'bare',
   size: { min: { w: 960, h: 300 }, preferred: { w: 1920, h: 462 } },
   options: roomOptions,
@@ -249,7 +260,7 @@ export const room = defineWidget({
     if (width === box.w && height === box.h && canPaintOn(g, box.x, box.y)) paintScene(g, box.x, box.y, input);
     else g.drawImage(renderScene(input), box.x, box.y, box.w, box.h);
   },
-  demo: ({ now }) => ({ sources: { 'agents/sessions': { sessions: demoSessions(now), zombieMs: 15 * MIN }, 'weather/current': demoWeather(now) } }),
+  demo: ({ now, locale }) => ({ sources: { 'agents/sessions': { sessions: demoSessions(now, locale), zombieMs: 15 * MIN }, 'weather/current': demoWeather(now) } }),
 });
 
 export const duel = defineInterlude({
@@ -282,7 +293,7 @@ export const duel = defineInterlude({
 export default definePlugin({
   id: 'cats',
   name: { en: 'Cats room', es: 'Habitación de gatos', de: 'Katzenzimmer', 'zh-Hant': '貓咪房間', 'zh-Hans': '猫咪房间' },
-  version: '0.2.2',
+  version: '0.2.3',
   languages: ['en', 'es', 'de', 'zh-Hant', 'zh-Hans'],
   sdk: '^0.2.0',
   permissions: { exec: ['git'] },

@@ -43,12 +43,24 @@ export function coatFor(sessionId: string): string {
 }
 
 /**
- * The collar tells the provider: orange for Claude, blue for Gemini and purple
- * for the GitLab Runner cat (see src/runner.ts).
+ * The collar tells the agent: each one its own colour, far enough apart to
+ * tell at a glance on a small panel (and the GitLab Runner cat's purple, see
+ * src/runner.ts). An agent not listed wears a neutral grey, not another's.
  */
+export const COLLARS: Readonly<Record<string, string>> = {
+  claude: '#D9663A',
+  gemini: '#3F7FE0',
+  codex: '#14A37F',
+  qwen: '#C2439A',
+  kimi: '#27B3C6',
+  opencode: '#E0B13A',
+  iflow: '#86C04A',
+  'gitlab-runner': '#7B5CD6',
+};
+export const OTHER_COLLAR = '#8C929C';
+
 export function collarFor(provider: Provider): string {
-  if (provider === 'gitlab-runner') return '#7B5CD6';
-  return provider === 'gemini' ? '#3F7FE0' : '#D9663A';
+  return COLLARS[provider] ?? OTHER_COLLAR;
 }
 
 export type Mood = 'open' | 'wide' | 'happy' | 'angry';

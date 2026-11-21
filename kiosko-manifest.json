@@ -9,7 +9,7 @@
     "zh-Hant": "貓咪房間",
     "zh-Hans": "猫咪房间"
   },
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": {
     "en": "Your AI agent sessions as cats in a room: what needs you comes forward. From aimonitor.",
     "es": "Tus sesiones de agentes IA como gatos en una habitación: lo que te reclama se acerca. De aimonitor.",
@@ -42,6 +42,9 @@
     "agents",
     "claude",
     "gemini",
+    "codex",
+    "qwen",
+    "kimi",
     "illustration"
   ],
   "permissions": {
@@ -85,6 +88,9 @@
         "agents",
         "claude",
         "gemini",
+        "codex",
+        "qwen",
+        "kimi",
         "illustration"
       ],
       "size": {
@@ -585,7 +591,15 @@
         "mirror/countdown",
         "mirror/onthisday",
         "usage/rail"
+      ],
+      "layouts": [
+        "wide",
+        "square"
       ]
     }
-  ]
+  ],
+  "support": {
+    "issues": "https://github.com/kiosko-lcd/kiosko-plugin-cats/issues",
+    "docs": "https://github.com/kiosko-lcd/kiosko-plugin-cats#readme"
+  }
 }

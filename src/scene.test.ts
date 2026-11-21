@@ -190,3 +190,22 @@ test('cabinet plate: week and commits in the panel language', async () => {
   assert.equal(shelfLabel(shelf, wordsIn('es')), 'sem. 46 · 1 commit');
   assert.equal(shelfLabel({ ...shelf, weeks: [{ commits: 7, mrs: 2 }] } as typeof shelf, wordsIn('zh-TW')), '第 46 週 · 7 次提交 · 2 MR');
 });
+
+test('each agent wears its own collar; an unknown one a neutral grey, never Claude’s', async () => {
+  const { COLLARS, OTHER_COLLAR, collarFor } = await import('./cat.ts');
+  const colours = Object.values(COLLARS);
+  assert.equal(new Set(colours).size, colours.length, 'no two agents share a collar');
+  assert.ok(!colours.includes(OTHER_COLLAR));
+  assert.equal(collarFor('claude'), COLLARS.claude);
+  assert.equal(collarFor('qwen'), COLLARS.qwen);
+  assert.equal(collarFor('some-new-agent'), OTHER_COLLAR);
+});
+
+test('the demo in Simplified Chinese shows agents offered in mainland China; elsewhere a mix', () => {
+  for (const locale of ['zh-Hans', 'zh-CN', 'zh']) {
+    const providers = demoSessions(T0, locale).map((s) => s.provider);
+    assert.ok(!providers.includes('claude') && !providers.includes('gemini'), `${locale}: ${providers}`);
+  }
+  assert.ok(demoSessions(T0, 'zh-Hant').some((s) => s.provider === 'claude'), 'Taiwan keeps Claude');
+  assert.ok(demoSessions(T0, 'en').some((s) => s.provider === 'claude'));
+});
