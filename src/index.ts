@@ -282,7 +282,7 @@ export const duel = defineInterlude({
 export default definePlugin({
   id: 'cats',
   name: { en: 'Cats room', es: 'Habitación de gatos', de: 'Katzenzimmer', 'zh-Hant': '貓咪房間', 'zh-Hans': '猫咪房间' },
-  version: '0.2.1',
+  version: '0.2.2',
   languages: ['en', 'es', 'de', 'zh-Hant', 'zh-Hans'],
   sdk: '^0.2.0',
   permissions: { exec: ['git'] },
