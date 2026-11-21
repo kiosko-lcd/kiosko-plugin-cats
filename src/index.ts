@@ -14,7 +14,7 @@ import { useCanvas } from './canvas.ts';
 import { DUEL_FPS, planDuel, prerenderDuel } from './duel-egg.ts';
 import { ROOMS, type RoomName } from './room.ts';
 import { FORCED_KINDS, MOVE_SECONDS, candidates, gestureAt, placements, planGesture, significantMove, type GestureKind, type Placement } from './anim.ts';
-import { lastBuiltSet, renderScene, sceneLayout, surroundings, type SceneInput, type SceneOptions } from './scene.ts';
+import { canPaintOn, lastBuiltSet, paintScene, renderScene, sceneLayout, surroundings, type SceneInput, type SceneOptions } from './scene.ts';
 import { readShelf, type ShelfView } from './shelf.ts';
 import { addTrophy, loadTrophies, thisWeek } from './trophies.ts';
 import { filterProjects, sessionsOf, zombieMsOf, type SessionView } from './types.ts';
@@ -232,7 +232,7 @@ export const room = defineWidget({
     useCanvas(ctx.canvas);
     const weather = sources['weather/current'] as Weather | undefined;
     const width = Math.max(1, Math.round(box.w)), height = Math.max(1, Math.round(box.h));
-    const frame = renderScene({
+    const input: SceneInput = {
       sessions: filterProjects(sessionsOf(sources), options.projects),
       now,
       width,
@@ -244,8 +244,10 @@ export const room = defineWidget({
       shelf: options.shelf ? ctx.data?.shelf ?? null : null,
       trophies: ctx.data?.trophies ?? [],
       ...animationOf(ctx.anim),
-    });
-    g.drawImage(frame, box.x, box.y, box.w, box.h);
+    };
+    // Straight on the panel when it comes out the same (a whole-pixel box), else on a canvas of its own.
+    if (width === box.w && height === box.h && canPaintOn(g, box.x, box.y)) paintScene(g, box.x, box.y, input);
+    else g.drawImage(renderScene(input), box.x, box.y, box.w, box.h);
   },
   demo: ({ now }) => ({ sources: { 'agents/sessions': { sessions: demoSessions(now), zombieMs: 15 * MIN }, 'weather/current': demoWeather(now) } }),
 });

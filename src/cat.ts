@@ -12,6 +12,7 @@ import {
   type Coat, type X, TAU, bezierPts, clamp, creamRamp, css, ellipse, eye, fur, furryShape, hashString, hex, linear, mix,
   radial, ramp, rng, smooth, sphereLight, tailAlong,
 } from './paint.ts';
+import { type LayerCache, paintParts } from './layers.ts';
 import type { Provider } from './types.ts';
 
 const r5 = (a: string, b: string, c: string, d: string, e: string) => ({ deep: hex(a), dark: hex(b), mid: hex(c), light: hex(d), top: hex(e) });
@@ -116,6 +117,9 @@ function eyelid(c: X, coat: Coat, ex: number, ey: number, rx: number, ry: number
   c.stroke();
 }
 
+/** A coat, as a key for the layers of a gesture (see `paintParts`). */
+const coatKey = (k: Coat) => `${k.fur.mid.join(',')}/${k.stripe.join(',')}/${k.stripeK}/${k.eye[1]?.[1]}`;
+
 // ---------- Shared silhouettes ----------
 const angDist = (a: number, b: number) => Math.abs(((a - b + Math.PI * 3) % TAU) - Math.PI);
 /** Furry cheeks; `puff` bristles the whole head (angry). */
@@ -216,223 +220,244 @@ function furryBody(c: X, coat: Coat, seed: number, back: boolean): void {
 
 // ---------- Poses ----------
 
-/** Sitting front-on, looking at you. */
-export function frontCat(c: X, coat: Coat, o: { mood?: Mood; collar?: string; shadow?: boolean; pose?: Pose; dilate?: boolean } = {}): void {
+/** Sitting front-on, looking at you. `layers`: see `paintParts` (only for the poses of a gesture). */
+export function frontCat(c: X, coat: Coat, o: { mood?: Mood; collar?: string; shadow?: boolean; pose?: Pose; dilate?: boolean; layers?: LayerCache } = {}): void {
   const g = o.pose ?? {};
   const mood = o.mood ?? 'open';
   const angry = mood === 'angry';
   const head = headShape(angry ? 0.13 : 0);
-  if (o.shadow !== false) {
-    contactShadow(c, 120);
-    c.fillStyle = 'rgba(0,0,0,0.55)';
-    ellipse(c, 0, -1, 62, 5);
-    c.fill();
-  }
-  tailAlong(c, coat, bezierPts(swingTail([[42, -16], [116, -20], [134, -84], [100, -136]], g.swing ?? 0)), 5, angry ? 1.9 : 1);
-  furryBody(c, coat, 2, false);
-
-  // Front paws with toes
-  for (const s of [-1, 1]) {
-    const paw = (cc: X) => furryShape(cc, s * 23, -11, 21, 13, 2.2, (a) => (Math.sin(a) < -0.3 ? 0.05 : 0), 30 + s);
-    paw(c);
-    c.fillStyle = css(coat.cream.mid);
-    c.fill();
-    fur(c, coat, paw, [s * 23 - 24, -26, s * 23 + 24, 3], 260, {
-      seed: 40 + s, light: sphereLight(s * 23, -14, 22, 14), dir: () => Math.PI / 2, len: [4, 7], width: 1.2, cream: () => 1,
-    });
-    c.strokeStyle = 'rgba(150,100,60,0.6)';
-    c.lineWidth = 1.6;
-    for (const d of [-7, 0, 7]) {
-      c.beginPath();
-      c.moveTo(s * 23 + d, -1);
-      c.lineTo(s * 23 + d * 1.1, -9);
-      c.stroke();
-    }
-  }
-
-  furryEars(c, coat, angry, true, g.ear ?? 0);
-
-  head(c);
-  c.fillStyle = radial(c, -10, -206, 10, 120, [[0, css(coat.fur.light)], [0.55, css(coat.fur.mid)], [1, css(coat.fur.dark)]], -36, -240);
-  c.fill();
-  fur(c, coat, head, [-115, -275, 115, -115], 5200, {
-    seed: 9, light: sphereLight(-6, -198, 100, 80),
-    // The face fur starts at the nose and fans outward
-    dir: (x, y) => Math.atan2(y + 158, x),
-    stripe: (x, y) => {
-      let v = 0;
-      // Forehead stripes in an "M"
-      for (const sx of [-20, 0, 20]) v = Math.max(v, (1 - smooth(3, 7, Math.abs(x - sx * (1 + (y + 262) / 200)))) * (1 - smooth(-238, -222, y)));
-      if (Math.abs(x) > 64) v = Math.max(v, smooth(0.5, 0.9, Math.sin((y + 196) * 0.3 - 0.5)) * smooth(64, 80, Math.abs(x)));
-      return v;
-    },
-    cream: (x, y) => {
-      const m = 1 - smooth(0.7, 1.05, Math.min(Math.hypot((x + 16) / 24, (y + 150) / 19), Math.hypot((x - 16) / 24, (y + 150) / 19)));
-      const chin = 1 - smooth(0.7, 1.1, Math.hypot(x / 20, (y + 134) / 10));
-      return Math.max(m, chin);
-    },
-  });
-  c.save();
-  head(c);
-  c.clip();
-  c.strokeStyle = linear(c, 0, -266, 100, -170, [[0, 'rgba(255,236,200,0)'], [0.55, 'rgba(255,236,200,0.35)'], [1, 'rgba(255,236,200,0)']]);
-  c.lineWidth = 7;
-  head(c);
-  c.stroke();
-  c.restore();
-
-  // Eyes
-  if (mood === 'happy') {
-    c.strokeStyle = '#3A1A08';
-    c.lineWidth = 4.5;
-    c.lineCap = 'round';
-    for (const s of [-1, 1]) {
-      c.beginPath();
-      c.moveTo(s * 38 - 17, -192);
-      c.quadraticCurveTo(s * 38, -210, s * 38 + 17, -192);
-      c.stroke();
-    }
-    c.fillStyle = 'rgba(255,120,140,0.35)';
-    ellipse(c, -62, -172, 14, 8);
-    c.fill();
-    ellipse(c, 62, -172, 14, 8);
-    c.fill();
-  } else {
-    const wide = mood === 'wide';
-    // In the small hours, in the dim light, the pupil almost eats the iris.
-    const pupil = o.dilate && !angry ? 21 : wide ? 15 : angry ? 3.5 : 9;
-    for (const s of [-1, 1]) eye(c, coat.eye, s * 38, -198, wide ? 28 : 26, wide ? 32 : 29, pupil);
-    const lid = Math.max(g.lid ?? 0, (g.yawn ?? 0) * 0.8);
-    if (!angry && lid > 0) for (const s of [-1, 1]) eyelid(c, coat, s * 38, -198, wide ? 28 : 26, wide ? 32 : 29, lid);
-    if (angry) {
-      for (const s of [-1, 1]) {
-        // Eyelid lowered diagonally: the frown
-        c.fillStyle = css(coat.fur.dark);
-        c.beginPath();
-        c.moveTo(s * 4, -236);
-        c.lineTo(s * 70, -236);
-        c.lineTo(s * 70, -214);
-        c.lineTo(s * 8, -196);
-        c.closePath();
+  const wide = mood === 'wide';
+  // In the small hours, in the dim light, the pupil almost eats the iris.
+  const pupil = o.dilate && !angry ? 21 : wide ? 15 : angry ? 3.5 : 9;
+  const lid = Math.max(g.lid ?? 0, (g.yawn ?? 0) * 0.8);
+  const lids = mood !== 'happy' && !angry && lid > 0;
+  const yawn = !angry && (g.yawn ?? 0) > 0;
+  paintParts(c, `front:${coatKey(coat)}:${mood}:${o.collar}:${pupil}:${o.shadow}`, [
+    { key: 'shadow', cheap: true, draw: (c) => {
+      if (o.shadow !== false) {
+        contactShadow(c, 120);
+        c.fillStyle = 'rgba(0,0,0,0.55)';
+        ellipse(c, 0, -1, 62, 5);
         c.fill();
-        c.strokeStyle = '#2A1206';
-        c.lineWidth = 3.5;
+      }
+    } },
+    { key: `tail${g.swing ?? 0}`, live: !!g.swing, draw: (c) => {
+      tailAlong(c, coat, bezierPts(swingTail([[42, -16], [116, -20], [134, -84], [100, -136]], g.swing ?? 0)), 5, angry ? 1.9 : 1);
+    } },
+    { key: 'body', draw: (c) => {
+      furryBody(c, coat, 2, false);
+
+      // Front paws with toes
+      for (const s of [-1, 1]) {
+        const paw = (cc: X) => furryShape(cc, s * 23, -11, 21, 13, 2.2, (a) => (Math.sin(a) < -0.3 ? 0.05 : 0), 30 + s);
+        paw(c);
+        c.fillStyle = css(coat.cream.mid);
+        c.fill();
+        fur(c, coat, paw, [s * 23 - 24, -26, s * 23 + 24, 3], 260, {
+          seed: 40 + s, light: sphereLight(s * 23, -14, 22, 14), dir: () => Math.PI / 2, len: [4, 7], width: 1.2, cream: () => 1,
+        });
+        c.strokeStyle = 'rgba(150,100,60,0.6)';
+        c.lineWidth = 1.6;
+        for (const d of [-7, 0, 7]) {
+          c.beginPath();
+          c.moveTo(s * 23 + d, -1);
+          c.lineTo(s * 23 + d * 1.1, -9);
+          c.stroke();
+        }
+      }
+    } },
+    { key: `ears${g.ear ?? 0}`, live: !!g.ear, draw: (c) => {
+      furryEars(c, coat, angry, true, g.ear ?? 0);
+    } },
+    { key: 'head', draw: (c) => {
+      head(c);
+      c.fillStyle = radial(c, -10, -206, 10, 120, [[0, css(coat.fur.light)], [0.55, css(coat.fur.mid)], [1, css(coat.fur.dark)]], -36, -240);
+      c.fill();
+      fur(c, coat, head, [-115, -275, 115, -115], 5200, {
+        seed: 9, light: sphereLight(-6, -198, 100, 80),
+        // The face fur starts at the nose and fans outward
+        dir: (x, y) => Math.atan2(y + 158, x),
+        stripe: (x, y) => {
+          let v = 0;
+          // Forehead stripes in an "M"
+          for (const sx of [-20, 0, 20]) v = Math.max(v, (1 - smooth(3, 7, Math.abs(x - sx * (1 + (y + 262) / 200)))) * (1 - smooth(-238, -222, y)));
+          if (Math.abs(x) > 64) v = Math.max(v, smooth(0.5, 0.9, Math.sin((y + 196) * 0.3 - 0.5)) * smooth(64, 80, Math.abs(x)));
+          return v;
+        },
+        cream: (x, y) => {
+          const m = 1 - smooth(0.7, 1.05, Math.min(Math.hypot((x + 16) / 24, (y + 150) / 19), Math.hypot((x - 16) / 24, (y + 150) / 19)));
+          const chin = 1 - smooth(0.7, 1.1, Math.hypot(x / 20, (y + 134) / 10));
+          return Math.max(m, chin);
+        },
+      });
+      c.save();
+      head(c);
+      c.clip();
+      c.strokeStyle = linear(c, 0, -266, 100, -170, [[0, 'rgba(255,236,200,0)'], [0.55, 'rgba(255,236,200,0.35)'], [1, 'rgba(255,236,200,0)']]);
+      c.lineWidth = 7;
+      head(c);
+      c.stroke();
+      c.restore();
+    } },
+    { key: 'eyes', draw: (c) => {
+      if (mood === 'happy') {
+        c.strokeStyle = '#3A1A08';
+        c.lineWidth = 4.5;
+        c.lineCap = 'round';
+        for (const s of [-1, 1]) {
+          c.beginPath();
+          c.moveTo(s * 38 - 17, -192);
+          c.quadraticCurveTo(s * 38, -210, s * 38 + 17, -192);
+          c.stroke();
+        }
+        c.fillStyle = 'rgba(255,120,140,0.35)';
+        ellipse(c, -62, -172, 14, 8);
+        c.fill();
+        ellipse(c, 62, -172, 14, 8);
+        c.fill();
+      } else {
+        for (const s of [-1, 1]) eye(c, coat.eye, s * 38, -198, wide ? 28 : 26, wide ? 32 : 29, pupil);
+      }
+    } },
+    { key: `lids${lids ? lid : 0}`, live: lids, cheap: true, draw: (c) => {
+      if (lids) for (const s of [-1, 1]) eyelid(c, coat, s * 38, -198, wide ? 28 : 26, wide ? 32 : 29, lid);
+    } },
+    { key: 'frown', cheap: true, draw: (c) => {
+      if (angry) {
+        for (const s of [-1, 1]) {
+          // Eyelid lowered diagonally: the frown
+          c.fillStyle = css(coat.fur.dark);
+          c.beginPath();
+          c.moveTo(s * 4, -236);
+          c.lineTo(s * 70, -236);
+          c.lineTo(s * 70, -214);
+          c.lineTo(s * 8, -196);
+          c.closePath();
+          c.fill();
+          c.strokeStyle = '#2A1206';
+          c.lineWidth = 3.5;
+          c.beginPath();
+          c.moveTo(s * 8, -196);
+          c.lineTo(s * 68, -214);
+          c.stroke();
+        }
+      }
+    } },
+    { key: 'nose', cheap: true, draw: (c) => {
+      // Whisker pads, nose and mouth
+      c.fillStyle = 'rgba(120,70,40,0.55)';
+      for (const s of [-1, 1]) {
+        for (const [dx, dy] of [[14, -154], [20, -150], [26, -154], [18, -145], [24, -142]] as const) {
+          ellipse(c, s * dx, dy, 1.3, 1.3);
+          c.fill();
+        }
+      }
+      c.beginPath();
+      c.moveTo(-11, -168);
+      c.bezierCurveTo(-4, -172, 4, -172, 11, -168);
+      c.bezierCurveTo(10, -160, 4, -155, 0, -154);
+      c.bezierCurveTo(-4, -155, -10, -160, -11, -168);
+      c.fillStyle = radial(c, -3, -166, 1, 14, [[0, '#FFC9D4'], [0.6, '#EE7F96'], [1, '#B8465E']]);
+      c.fill();
+      c.strokeStyle = '#7A2A38';
+      c.lineWidth = 1.5;
+      c.stroke();
+      c.fillStyle = 'rgba(255,255,255,0.7)';
+      ellipse(c, -4, -167, 3, 1.5);
+      c.fill();
+    } },
+    { key: `mouth${yawn ? g.yawn : 0}`, live: yawn, cheap: true, draw: (c) => {
+      c.strokeStyle = '#5A2410';
+      c.lineWidth = 2.2;
+      c.lineCap = 'round';
+      if (angry) {
+        // Hiss: mouth open with fangs
+        c.fillStyle = '#4A0E14';
+        ellipse(c, 0, -138, 17, 12);
+        c.fill();
+        c.fillStyle = '#E0607A';
+        ellipse(c, 0, -132, 9, 5);
+        c.fill();
+        c.fillStyle = '#FFFFFF';
+        for (const s of [-1, 1]) {
+          c.beginPath();
+          c.moveTo(s * 12, -148);
+          c.lineTo(s * 7, -148);
+          c.lineTo(s * 9.5, -137);
+          c.fill();
+        }
         c.beginPath();
-        c.moveTo(s * 8, -196);
-        c.lineTo(s * 68, -214);
+        c.moveTo(0, -154);
+        c.lineTo(0, -150);
+        c.stroke();
+      } else if ((g.yawn ?? 0) > 0) {
+        // Yawn: the mouth opens downward, with tongue and fangs
+        const y = g.yawn!;
+        const my = -140 + 5 * y, rx = 9 + 11 * y, ry = 3 + 15 * y;
+        c.fillStyle = '#4A0E14';
+        ellipse(c, 0, my, rx, ry);
+        c.fill();
+        c.fillStyle = '#E0607A';
+        ellipse(c, 0, my + ry * 0.5, rx * 0.65, ry * 0.45);
+        c.fill();
+        c.fillStyle = '#FFFFFF';
+        for (const s of [-1, 1]) {
+          c.beginPath();
+          c.moveTo(s * rx * 0.75, my - ry * 0.55);
+          c.lineTo(s * rx * 0.45, my - ry * 0.55);
+          c.lineTo(s * rx * 0.6, my - ry * 0.55 + 4 + 5 * y);
+          c.fill();
+        }
+        c.beginPath();
+        c.moveTo(0, -154);
+        c.lineTo(0, my - ry);
+        c.stroke();
+      } else {
+        const k = mood === 'happy' ? 1.35 : 1;
+        c.beginPath();
+        c.moveTo(0, -154);
+        c.lineTo(0, -147);
+        c.bezierCurveTo(-4 * k, -140 - (k - 1) * 8, -12 * k, -140, -16 * k, -146);
+        c.moveTo(0, -147);
+        c.bezierCurveTo(4 * k, -140 - (k - 1) * 8, 12 * k, -140, 16 * k, -146);
         c.stroke();
       }
-    }
-  }
+    } },
+    { key: 'collar', cheap: true, draw: (c) => {
+      whiskers(c, 36, -150);
 
-  // Whisker pads, nose and mouth
-  c.fillStyle = 'rgba(120,70,40,0.55)';
-  for (const s of [-1, 1]) {
-    for (const [dx, dy] of [[14, -154], [20, -150], [26, -154], [18, -145], [24, -142]] as const) {
-      ellipse(c, s * dx, dy, 1.3, 1.3);
-      c.fill();
-    }
-  }
-  c.beginPath();
-  c.moveTo(-11, -168);
-  c.bezierCurveTo(-4, -172, 4, -172, 11, -168);
-  c.bezierCurveTo(10, -160, 4, -155, 0, -154);
-  c.bezierCurveTo(-4, -155, -10, -160, -11, -168);
-  c.fillStyle = radial(c, -3, -166, 1, 14, [[0, '#FFC9D4'], [0.6, '#EE7F96'], [1, '#B8465E']]);
-  c.fill();
-  c.strokeStyle = '#7A2A38';
-  c.lineWidth = 1.5;
-  c.stroke();
-  c.fillStyle = 'rgba(255,255,255,0.7)';
-  ellipse(c, -4, -167, 3, 1.5);
-  c.fill();
-  c.strokeStyle = '#5A2410';
-  c.lineWidth = 2.2;
-  c.lineCap = 'round';
-  if (angry) {
-    // Hiss: mouth open with fangs
-    c.fillStyle = '#4A0E14';
-    ellipse(c, 0, -138, 17, 12);
-    c.fill();
-    c.fillStyle = '#E0607A';
-    ellipse(c, 0, -132, 9, 5);
-    c.fill();
-    c.fillStyle = '#FFFFFF';
-    for (const s of [-1, 1]) {
+      // Collar half hidden in the chest fur
+      c.strokeStyle = o.collar ?? '#C8303F';
+      c.lineWidth = 9;
       c.beginPath();
-      c.moveTo(s * 12, -148);
-      c.lineTo(s * 7, -148);
-      c.lineTo(s * 9.5, -137);
-      c.fill();
-    }
-    c.beginPath();
-    c.moveTo(0, -154);
-    c.lineTo(0, -150);
-    c.stroke();
-  } else if ((g.yawn ?? 0) > 0) {
-    // Yawn: the mouth opens downward, with tongue and fangs
-    const y = g.yawn!;
-    const my = -140 + 5 * y, rx = 9 + 11 * y, ry = 3 + 15 * y;
-    c.fillStyle = '#4A0E14';
-    ellipse(c, 0, my, rx, ry);
-    c.fill();
-    c.fillStyle = '#E0607A';
-    ellipse(c, 0, my + ry * 0.5, rx * 0.65, ry * 0.45);
-    c.fill();
-    c.fillStyle = '#FFFFFF';
-    for (const s of [-1, 1]) {
+      c.moveTo(-48, -136);
+      c.quadraticCurveTo(0, -116, 48, -136);
+      c.stroke();
+      c.strokeStyle = 'rgba(255,255,255,0.25)';
+      c.lineWidth = 2;
       c.beginPath();
-      c.moveTo(s * rx * 0.75, my - ry * 0.55);
-      c.lineTo(s * rx * 0.45, my - ry * 0.55);
-      c.lineTo(s * rx * 0.6, my - ry * 0.55 + 4 + 5 * y);
+      c.moveTo(-46, -139);
+      c.quadraticCurveTo(0, -120, 46, -139);
+      c.stroke();
+      const rc = rng(90);
+      const cr = creamRamp(coat);
+      for (let i = 0; i < 60; i++) {
+        const x = (rc() - 0.5) * 70, y = -126 + (x / 48) ** 2 * -10 + 2;
+        c.strokeStyle = css(ramp(0.55 + rc() * 0.3, cr), 0.85);
+        c.lineWidth = 1.4;
+        c.beginPath();
+        c.moveTo(x, y);
+        c.lineTo(x + (rc() - 0.5) * 4, y + 7 + rc() * 8);
+        c.stroke();
+      }
+      c.fillStyle = radial(c, -3, -117, 1, 12, [[0, '#FFF6B0'], [0.55, '#F5C534'], [1, '#9A6C08']]);
+      ellipse(c, 0, -114, 10.5, 10.5);
       c.fill();
-    }
-    c.beginPath();
-    c.moveTo(0, -154);
-    c.lineTo(0, my - ry);
-    c.stroke();
-  } else {
-    const k = mood === 'happy' ? 1.35 : 1;
-    c.beginPath();
-    c.moveTo(0, -154);
-    c.lineTo(0, -147);
-    c.bezierCurveTo(-4 * k, -140 - (k - 1) * 8, -12 * k, -140, -16 * k, -146);
-    c.moveTo(0, -147);
-    c.bezierCurveTo(4 * k, -140 - (k - 1) * 8, 12 * k, -140, 16 * k, -146);
-    c.stroke();
-  }
-  whiskers(c, 36, -150);
-
-  // Collar half hidden in the chest fur
-  c.strokeStyle = o.collar ?? '#C8303F';
-  c.lineWidth = 9;
-  c.beginPath();
-  c.moveTo(-48, -136);
-  c.quadraticCurveTo(0, -116, 48, -136);
-  c.stroke();
-  c.strokeStyle = 'rgba(255,255,255,0.25)';
-  c.lineWidth = 2;
-  c.beginPath();
-  c.moveTo(-46, -139);
-  c.quadraticCurveTo(0, -120, 46, -139);
-  c.stroke();
-  const rc = rng(90);
-  const cr = creamRamp(coat);
-  for (let i = 0; i < 60; i++) {
-    const x = (rc() - 0.5) * 70, y = -126 + (x / 48) ** 2 * -10 + 2;
-    c.strokeStyle = css(ramp(0.55 + rc() * 0.3, cr), 0.85);
-    c.lineWidth = 1.4;
-    c.beginPath();
-    c.moveTo(x, y);
-    c.lineTo(x + (rc() - 0.5) * 4, y + 7 + rc() * 8);
-    c.stroke();
-  }
-  c.fillStyle = radial(c, -3, -117, 1, 12, [[0, '#FFF6B0'], [0.55, '#F5C534'], [1, '#9A6C08']]);
-  ellipse(c, 0, -114, 10.5, 10.5);
-  c.fill();
-  c.strokeStyle = '#7A5406';
-  c.lineWidth = 1.2;
-  c.stroke();
+      c.strokeStyle = '#7A5406';
+      c.lineWidth = 1.2;
+      c.stroke();
+    } },
+  ], o.layers);
 }
 
 function whiskers(c: X, x0Abs: number, y: number): void {
@@ -472,47 +497,63 @@ export function laptop(c: X, halfW: number): void {
   c.fill();
 }
 
-/** From behind, facing the laptop. The screen outlines it in blue. */
-export function backCat(c: X, coat: Coat, seed: number, o: { laptop?: boolean; tail?: boolean; pose?: Pose } = {}): void {
+/** From behind, facing the laptop. The screen outlines it in blue. `layers`: see `paintParts`. */
+export function backCat(c: X, coat: Coat, seed: number, o: { laptop?: boolean; tail?: boolean; pose?: Pose; layers?: LayerCache } = {}): void {
   const g = o.pose ?? {};
-  contactShadow(c, 125);
-  if (o.laptop !== false) laptop(c, 165);
-  if (o.tail !== false) tailAlong(c, coat, bezierPts(swingTail([[40, -10], [130, -4], [150, -44], [112, -62]], (g.swing ?? 0) * 0.7)), seed + 1);
-  furryBody(c, coat, seed + 2, true);
-  furryEars(c, coat, false, false, g.ear ?? 0);
   const head = headShape(0);
-  head(c);
-  c.fillStyle = radial(c, -10, -206, 10, 120, [[0, css(coat.fur.light)], [0.55, css(coat.fur.mid)], [1, css(coat.fur.dark)]], -36, -240);
-  c.fill();
-  fur(c, coat, head, [-115, -275, 115, -115], 3800, {
-    seed: seed + 9, light: sphereLight(-6, -198, 100, 80), dir: (x) => Math.PI / 2 + x * 0.005,
-    stripe: (x, y) => {
-      let v = 0;
-      for (const sx of [-26, 0, 26]) v = Math.max(v, (1 - smooth(4, 9, Math.abs(x - sx))) * (1 - smooth(-200, -170, y)));
-      return v;
-    },
-  });
-  // Screen light only on the outer contour: the whole head and ears,
-  // the body below the chin. Otherwise the line between
-  // head and body stands out and the cat looks made of glass.
-  c.save();
-  c.globalCompositeOperation = 'source-atop';
-  // Thin and faint: at 8 px and 50 % it looked like a glass cat. The light only
-  // has to hint at the screen in front of it.
-  c.strokeStyle = 'rgba(160,215,255,0.3)';
-  c.lineWidth = 4;
-  head(c);
-  c.stroke();
-  for (const s of [-1, 1]) {
-    ear(c, s);
-    c.stroke();
-  }
-  c.beginPath();
-  c.rect(-200, -126, 400, 130);
-  c.clip();
-  body(c);
-  c.stroke();
-  c.restore();
+  const swing = o.tail !== false ? (g.swing ?? 0) : 0;
+  paintParts(c, `back:${coatKey(coat)}:${seed}:${o.laptop}:${o.tail}`, [
+    { key: 'desk', cheap: true, draw: (c) => {
+      contactShadow(c, 125);
+      if (o.laptop !== false) laptop(c, 165);
+    } },
+    { key: `tail${swing}`, live: !!swing, draw: (c) => {
+      if (o.tail !== false) tailAlong(c, coat, bezierPts(swingTail([[40, -10], [130, -4], [150, -44], [112, -62]], (g.swing ?? 0) * 0.7)), seed + 1);
+    } },
+    { key: 'body', draw: (c) => {
+      furryBody(c, coat, seed + 2, true);
+    } },
+    { key: `ears${g.ear ?? 0}`, live: !!g.ear, draw: (c) => {
+      furryEars(c, coat, false, false, g.ear ?? 0);
+    } },
+    { key: 'head', draw: (c) => {
+      head(c);
+      c.fillStyle = radial(c, -10, -206, 10, 120, [[0, css(coat.fur.light)], [0.55, css(coat.fur.mid)], [1, css(coat.fur.dark)]], -36, -240);
+      c.fill();
+      fur(c, coat, head, [-115, -275, 115, -115], 3800, {
+        seed: seed + 9, light: sphereLight(-6, -198, 100, 80), dir: (x) => Math.PI / 2 + x * 0.005,
+        stripe: (x, y) => {
+          let v = 0;
+          for (const sx of [-26, 0, 26]) v = Math.max(v, (1 - smooth(4, 9, Math.abs(x - sx))) * (1 - smooth(-200, -170, y)));
+          return v;
+        },
+      });
+    } },
+    // It lights what is already painted (source-atop): on the real canvas, always.
+    { key: 'glow', direct: true, draw: (c) => {
+      // Screen light only on the outer contour: the whole head and ears,
+      // the body below the chin. Otherwise the line between
+      // head and body stands out and the cat looks made of glass.
+      c.save();
+      c.globalCompositeOperation = 'source-atop';
+      // Thin and faint: at 8 px and 50 % it looked like a glass cat. The light only
+      // has to hint at the screen in front of it.
+      c.strokeStyle = 'rgba(160,215,255,0.3)';
+      c.lineWidth = 4;
+      head(c);
+      c.stroke();
+      for (const s of [-1, 1]) {
+        ear(c, s);
+        c.stroke();
+      }
+      c.beginPath();
+      c.rect(-200, -126, 400, 130);
+      c.clip();
+      body(c);
+      c.stroke();
+      c.restore();
+    } },
+  ], o.layers);
 }
 
 /** Curled up and asleep. */
@@ -871,11 +912,11 @@ function pawTip(c: X, coat: Coat, x: number, y: number): void {
 }
 
 /** One waits for the other: kneads her back while she works. */
-export function knead(c: X, worker: Coat, kneader: Coat, collar: string, pose: Pose = {}): void {
-  backCat(c, worker, 31, { pose: { ear: pose.ear } });
+export function knead(c: X, worker: Coat, kneader: Coat, collar: string, pose: Pose = {}, layers?: LayerCache): void {
+  backCat(c, worker, 31, { pose: { ear: pose.ear }, layers });
   c.save();
   c.translate(190, 0);
-  frontCat(c, kneader, { mood: 'happy', collar, pose: { swing: pose.swing } });
+  frontCat(c, kneader, { mood: 'happy', collar, pose: { swing: pose.swing }, layers });
   for (const [py, lift] of [[-150, -10], [-104, 6]] as const) {
     const arm = (cc: X) => {
       cc.beginPath();
