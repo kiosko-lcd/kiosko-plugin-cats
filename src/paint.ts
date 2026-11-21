@@ -80,29 +80,58 @@ export interface FurOpts {
   width?: number;
 }
 
+/** A group of strokes of the same tone and width: one `stroke()`. */
+interface StrokeGroup {
+  color: string;
+  width: number;
+  /** Segments: [x0, y0, cx, cy, x1, y1] (quadratic) repeated. */
+  segs: number[];
+}
+
 /**
  * Strokes grouped by tone and width: one `stroke()` per group instead of one per
  * hair. Each drawing call costs native memory in @napi-rs/canvas until the
  * canvas is released, and a cat is tens of thousands of hairs; grouping them
  * brings that count down to a few dozen and is also considerably faster.
  * Quantizing the color to steps of 8 is not noticeable on strokes a pixel and a half wide.
+ *
+ * Hot path (a cat is ~10,000 hairs): the group is found by a number built
+ * from the quantized tone and width, not by a string, and the segment goes
+ * in without an intermediate array. Same groups, same order, same values.
  */
 class StrokeBatch {
-  private groups = new Map<string, { color: string; width: number; segs: number[] }>();
-  add(col: RGB, alpha: number, width: number, seg: number[]): void {
-    const q = col.map((v) => Math.min(255, Math.round(v / 8) * 8)) as RGB;
-    const w = Math.round(width * 4) / 4;
-    const key = `${q.join(',')}|${alpha}|${w}`;
-    let g = this.groups.get(key);
-    if (!g) {
-      g = { color: css(q, alpha), width: w, segs: [] };
-      this.groups.set(key, g);
-    }
-    g.segs.push(...seg);
+  private groups = new Map<number, StrokeGroup>();
+  /** Groups whose tone fell outside 0..255 (never for a coat, but kept exact). */
+  private odd = new Map<string, StrokeGroup>();
+  /** First-seen order across both maps, which is the painting order. */
+  private order: StrokeGroup[] = [];
+  private readonly alpha: number;
+  constructor(alpha: number) {
+    this.alpha = alpha;
   }
-  /** Segments: [x0, y0, cx, cy, x1, y1] (quadratic) repeated. */
+  add(r: number, g: number, b: number, width: number, x0: number, y0: number, cx: number, cy: number, x1: number, y1: number): void {
+    const qr = Math.min(255, Math.round(r / 8) * 8), qg = Math.min(255, Math.round(g / 8) * 8), qb = Math.min(255, Math.round(b / 8) * 8);
+    const w = Math.round(width * 4) / 4;
+    let grp: StrokeGroup | undefined;
+    if (qr >= 0 && qg >= 0 && qb >= 0 && w >= 0 && w < 256) {
+      // 0..255 per channel and a width in quarters below 256: one exact integer.
+      const key = ((qr * 256 + qg) * 256 + qb) * 1024 + w * 4;
+      grp = this.groups.get(key);
+      if (!grp) this.groups.set(key, (grp = this.group(qr, qg, qb, w)));
+    } else {
+      const key = `${qr},${qg},${qb}|${w}`;
+      grp = this.odd.get(key);
+      if (!grp) this.odd.set(key, (grp = this.group(qr, qg, qb, w)));
+    }
+    grp.segs.push(x0, y0, cx, cy, x1, y1);
+  }
+  private group(r: number, g: number, b: number, width: number): StrokeGroup {
+    const grp = { color: css([r, g, b], this.alpha), width, segs: [] };
+    this.order.push(grp);
+    return grp;
+  }
   flush(c: X): void {
-    for (const g of this.groups.values()) {
+    for (const g of this.order) {
       c.strokeStyle = g.color;
       c.lineWidth = g.width;
       c.beginPath();
@@ -114,7 +143,31 @@ class StrokeBatch {
       c.stroke();
     }
     this.groups.clear();
+    this.odd.clear();
+    this.order = [];
   }
+}
+
+/** `ramp` without the arrays: the tone of light `l` on `r`, written to `out`. Same arithmetic. */
+function rampTo(out: RGB, l: number, r: Ramp): RGB {
+  const t = clamp(l) * 4;
+  const i = Math.min(3, Math.floor(t));
+  const a = i === 0 ? r.deep : i === 1 ? r.dark : i === 2 ? r.mid : r.light;
+  const b = i === 0 ? r.dark : i === 1 ? r.mid : i === 2 ? r.light : r.top;
+  const u = t - i;
+  out[0] = a[0] + (b[0] - a[0]) * u;
+  out[1] = a[1] + (b[1] - a[1]) * u;
+  out[2] = a[2] + (b[2] - a[2]) * u;
+  return out;
+}
+
+/** `mix(a, b, t)` written to `out` (which may be `a`). Same arithmetic. */
+function mixTo(out: RGB, a: RGB, b: RGB, t: number): RGB {
+  const a0 = a[0], a1 = a[1], a2 = a[2];
+  out[0] = a0 + (b[0] - a0) * t;
+  out[1] = a1 + (b[1] - a1) * t;
+  out[2] = a2 + (b[2] - a2) * t;
+  return out;
 }
 
 /**
@@ -131,19 +184,23 @@ export function fur(c: X, coat: Coat, shape: (c: X) => void, box: [number, numbe
   c.lineCap = 'round';
   const [x0, y0, x1, y1] = box;
   const [l0, l1] = o.len ?? [6, 13];
-  const batch = new StrokeBatch();
+  const batch = new StrokeBatch(0.75);
+  const col: RGB = [0, 0, 0], tmp: RGB = [0, 0, 0], tmp2: RGB = [0, 0, 0];
+  const { light, dir, cream, stripe } = o;
+  const width = o.width ?? 1.6;
   for (let i = 0; i < n; i++) {
     const x = x0 + r() * (x1 - x0), y = y0 + r() * (y1 - y0);
-    const a = o.dir(x, y) + (r() - 0.5) * 0.5;
+    const a = dir(x, y) + (r() - 0.5) * 0.5;
     const len = l0 + r() * (l1 - l0);
-    const l = clamp(o.light(x, y) + (r() - 0.5) * 0.28);
-    let col = ramp(l, coat.fur);
-    const k = o.cream?.(x, y) ?? 0;
-    if (k > 0) col = mix(col, ramp(clamp(l + 0.1), cr), clamp(k));
-    const st = o.stripe?.(x, y) ?? 0;
-    if (st > 0) col = mix(col, mix(coat.stripe, coat.fur.deep, 1 - l), clamp(st) * coat.stripeK);
-    const w = (o.width ?? 1.6) * (0.7 + r() * 0.6);
-    batch.add(col, 0.75, w, [x, y, x + Math.cos(a) * len * 0.5 + (r() - 0.5) * 2, y + Math.sin(a) * len * 0.5, x + Math.cos(a) * len, y + Math.sin(a) * len]);
+    const l = clamp(light(x, y) + (r() - 0.5) * 0.28);
+    rampTo(col, l, coat.fur);
+    const k = cream?.(x, y) ?? 0;
+    if (k > 0) mixTo(col, col, rampTo(tmp, clamp(l + 0.1), cr), clamp(k));
+    const st = stripe?.(x, y) ?? 0;
+    if (st > 0) mixTo(col, col, mixTo(tmp2, coat.stripe, coat.fur.deep, 1 - l), clamp(st) * coat.stripeK);
+    const w = width * (0.7 + r() * 0.6);
+    const ca = Math.cos(a), sa = Math.sin(a);
+    batch.add(col[0], col[1], col[2], w, x, y, x + ca * len * 0.5 + (r() - 0.5) * 2, y + sa * len * 0.5, x + ca * len, y + sa * len);
   }
   batch.flush(c);
   c.restore();
@@ -154,14 +211,6 @@ export function tailAlong(c: X, coat: Coat, pts: [number, number][], seed: numbe
   const L: number[] = [0];
   for (let i = 1; i < pts.length; i++) L.push(L[i - 1]! + Math.hypot(pts[i]![0] - pts[i - 1]![0], pts[i]![1] - pts[i - 1]![1]));
   const total = L[L.length - 1]! || 1;
-  const at = (u: number): [number, number, number] => {
-    const d = u * total;
-    let i = 1;
-    while (i < L.length - 1 && L[i]! < d) i++;
-    const a = pts[i - 1]!, b = pts[i]!;
-    const t = (d - L[i - 1]!) / (L[i]! - L[i - 1]! || 1);
-    return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, Math.atan2(b[1] - a[1], b[0] - a[0])];
-  };
   c.lineCap = 'round';
   c.lineJoin = 'round';
   c.beginPath();
@@ -170,17 +219,25 @@ export function tailAlong(c: X, coat: Coat, pts: [number, number][], seed: numbe
   c.lineWidth = 25 * thick;
   c.stroke();
   const r = rng(seed);
-  const batch = new StrokeBatch();
+  const batch = new StrokeBatch(0.8);
+  const col: RGB = [0, 0, 0];
   const n = Math.round(Math.min(1400, total * 4) * thick);
   for (let i = 0; i < n; i++) {
     const u = r();
-    const [x, y, a0] = at(u);
+    // The point at `u` of the way along the polyline, and its heading.
+    const d = u * total;
+    let j = 1;
+    while (j < L.length - 1 && L[j]! < d) j++;
+    const p = pts[j - 1]!, q = pts[j]!;
+    const t = (d - L[j - 1]!) / (L[j]! - L[j - 1]! || 1);
+    const x = p[0] + (q[0] - p[0]) * t, y = p[1] + (q[1] - p[1]) * t, a0 = Math.atan2(q[1] - p[1], q[0] - p[0]);
     const a = a0 + (thick > 1 ? (r() - 0.5) * 1.6 : 0);
     const off = (r() - 0.5) * 23 * thick;
     const px = x - Math.sin(a0) * off, py = y + Math.cos(a0) * off;
     const band = Math.sin(u * (total / 7)) > 0.35 ? coat.stripeK : 0;
     const ex = px + Math.cos(a) * 10, ey = py + Math.sin(a) * 10;
-    batch.add(mix(ramp(clamp(0.58 - off / 30 + (r() - 0.5) * 0.25), coat.fur), coat.stripe, band), 0.8, 1.6, [px, py, (px + ex) / 2, (py + ey) / 2, ex, ey]);
+    mixTo(col, rampTo(col, clamp(0.58 - off / 30 + (r() - 0.5) * 0.25), coat.fur), coat.stripe, band);
+    batch.add(col[0], col[1], col[2], 1.6, px, py, (px + ex) / 2, (py + ey) / 2, ex, ey);
   }
   batch.flush(c);
 }

@@ -6,7 +6,11 @@
  *
  * Fur is tens of thousands of strokes: a detailed cat costs ~100 ms. So cats
  * and the room are cached already painted, and each frame only composes them
- * and writes what changes: tags, sign boards and the wall clock.
+ * and writes what changes: tags, sign boards and the wall clock. A gesture
+ * that changes a cat's drawing (a blink, the tail, the ears, a yawn) paints
+ * only the piece that moves over the rest of the cat, kept rasterised (see
+ * layers.ts). And the widget paints the scene straight on the panel's canvas
+ * when it can, without a canvas of its own to copy.
  *
  * Everything is designed at 462 units high (`DESIGN_H`) and scaled to the
  * canvas; the width in design units follows the canvas aspect.
@@ -14,6 +18,7 @@
 import type { Canvas } from '@kiosko/sdk';
 import { moonPhase, type SunTimes, type Weather } from '@loksly/weather-astro';
 import { createCanvas } from './canvas.ts';
+import { type Layer, type LayerCache, flatten } from './layers.ts';
 import { COATS, EXTENT, type Pose, backCat, boxGhost, boxSleeper, collarFor, frontCat, hiss, knead, laptop, pairHeart, schrodinger, sleepCat } from './cat.ts';
 import { drawCabinet, SHELF_W } from './cabinet.ts';
 import { DURATION, LONG_MEETING_MS, WINDY_KMH, branchOf, ease, isRain, isSnow, isStorm, poseAt, redraws, releaseTag, repoBirthday, sshHost, type Gesture, type Placement, type Surroundings } from './anim.ts';
@@ -124,6 +129,9 @@ class Lru<V> {
   get size() {
     return this.map.size;
   }
+  values(): IterableIterator<V> {
+    return this.map.values();
+  }
 }
 
 interface Sprite {
@@ -137,12 +145,28 @@ const SHORT_DUEL: Beat[] = shortDuel();
 const sprites = new Lru<Sprite>(32);
 // The poses and variants of the gestures have their own cache: they must not push out the still cats.
 const gestureSprites = new Lru<Sprite>(24);
+// The still pieces of the cats being animated (see layers.ts): a gesture's frames reuse them.
+const layers = new Lru<Layer>(16);
 const rooms = new Lru<Canvas>(4);
 const vignettes = new Lru<Canvas>(4);
 
+let layered = true;
+/** For the tests: paint the poses of the gestures whole, without the layers. */
+export function useLayers(on: boolean): void {
+  layered = on;
+}
+
 /** For tests and diagnostics: cats and rooms painted from scratch. */
-export function cacheStats(): { sprites: number; rooms: number; paints: number; roomPaints: number; gesturePaints: number } {
-  return { sprites: sprites.size, rooms: rooms.size, paints: sprites.misses, roomPaints: rooms.misses, gesturePaints: gestureSprites.misses };
+export function cacheStats(): { sprites: number; rooms: number; paints: number; roomPaints: number; gesturePaints: number; layers: number; layerPaints: number; bytes: number } {
+  // Pixels kept, 4 bytes each: what the caches weigh.
+  const px = (c: Canvas) => c.width * c.height * 4;
+  let bytes = 0;
+  for (const v of sprites.values()) bytes += px(v.canvas);
+  for (const v of gestureSprites.values()) bytes += px(v.canvas);
+  for (const v of layers.values()) bytes += px(v.canvas);
+  for (const v of rooms.values()) bytes += px(v);
+  for (const v of vignettes.values()) bytes += px(v);
+  return { sprites: sprites.size, rooms: rooms.size, paints: sprites.misses, roomPaints: rooms.misses, gesturePaints: gestureSprites.misses, layers: layers.size, layerPaints: layers.misses, bytes };
 }
 
 function vignette(w: number, h: number): Canvas {
@@ -162,23 +186,6 @@ const BOTTOM = 90; // how low it goes: shadows and the tails' heart
 const PAD = 45;
 
 const seedOf = (r: SessionView) => hashString(r.session_id) & 0xffff;
-
-/**
- * Copies to a clean canvas, to cache pixels only.
- *
- * @napi-rs/canvas doesn't rasterise while drawing: it records every call and
- * replays it when encoding or copying. A freshly painted canvas keeps the
- * whole recording of the fur alive (~260 bytes per call, 900 MB for 30
- * canvases of 100,000 strokes). Copying it with `drawImage` and keeping the
- * copy drops it.
- */
-function flatten(src: Canvas, blurPx = 0): Canvas {
-  const out = createCanvas(src.width, src.height);
-  const o = out.getContext('2d');
-  if (blurPx > 0) o.filter = `blur(${blurPx}px)`;
-  o.drawImage(src, 0, 0);
-  return out;
-}
 
 /**
  * Room light on a cat. Three levels and two sides, so the cache is renewed
@@ -227,17 +234,17 @@ const coat = (name: string) => COATS[name] ?? COATS.canela!;
  * changes with the hour or the day and lasts hours (wide pupils after
  * midnight, the Halloween ghost); that one goes in the static cache.
  */
-function paintPose(c: X, a: Actor, pose: Pose, flavor: string, words: Words, variant = ''): void {
+function paintPose(c: X, a: Actor, pose: Pose, flavor: string, words: Words, variant = '', cache?: LayerCache): void {
   const [r0, r1] = a.records;
   const c0 = coat(a.coats[0]!);
   const c1 = coat(a.coats[1] ?? a.coats[0]!);
   const box = `bold 26px ${MONO_BOLD}`;
   switch (a.pose) {
-    case 'cartel': frontCat(c, c0, { mood: 'wide', collar: collarFor(r0!.provider), pose, dilate: flavor.includes('n') }); break;
-    case 'sentado': frontCat(c, c0, { mood: 'open', collar: collarFor(r0!.provider), pose, dilate: flavor.includes('n') }); break;
+    case 'cartel': frontCat(c, c0, { mood: 'wide', collar: collarFor(r0!.provider), pose, dilate: flavor.includes('n'), layers: cache }); break;
+    case 'sentado': frontCat(c, c0, { mood: 'open', collar: collarFor(r0!.provider), pose, dilate: flavor.includes('n'), layers: cache }); break;
     case 'portatil':
       if (variant === 'soloPortatil') laptop(c, 165);
-      else backCat(c, c0, seedOf(r0!), { pose, laptop: variant !== 'sinPortatil' });
+      else backCat(c, c0, seedOf(r0!), { pose, laptop: variant !== 'sinPortatil', layers: cache });
       break;
     case 'dormido': sleepCat(c, c0, seedOf(r0!)); break;
     case 'caja': {
@@ -249,9 +256,16 @@ function paintPose(c: X, a: Actor, pose: Pose, flavor: string, words: Words, var
     }
     case 'schrodinger': schrodinger(c, `bold 64px ${MONO_BOLD}`, pose.lid ?? 0); break;
     case 'corazon': pairHeart(c, c0, c1); break;
-    case 'amasa': knead(c, c0, c1, collarFor(r1!.provider), pose); break;
+    case 'amasa': knead(c, c0, c1, collarFor(r1!.provider), pose, cache); break;
     case 'bufido': hiss(c, c0, c1, [collarFor(r0!.provider), collarFor(r1!.provider)]); break;
   }
+}
+
+/** Size of the sprite of `a` at `k` pixels per unit, and where its floor point is in it. */
+function spriteBox(a: Actor, k: number): { w: number; h: number; ox: number; oy: number } {
+  const s = a.scale * k;
+  const [L, R] = EXTENT[a.pose]!;
+  return { w: Math.max(1, Math.ceil((R - L + PAD * 2) * s)), h: Math.max(1, Math.ceil((TOP + BOTTOM) * s)), ox: (PAD - L) * s, oy: TOP * s };
 }
 
 /** The cat already painted at its scale and with its haze, ready to compose. */
@@ -260,16 +274,17 @@ function sprite(a: Actor, k: number, pose: Pose | undefined, light: Light, flavo
   const s = a.scale * k;
   const blur = blurFor(a);
   const rest = atRest(pose);
-  const key = [a.pose, a.coats.join(','), a.records.map((r) => `${r.provider}:${seedOf(r)}`).join(','), s.toFixed(3), fog.toFixed(3), `${light.level}${light.side}`, blur, variant, flavor, words.fragile, rest ? '' : JSON.stringify(pose)].join('|');
+  // What the drawing is, before the light, the haze and the pose.
+  const drawing = [a.pose, a.coats.join(','), a.records.map((r) => `${r.provider}:${seedOf(r)}`).join(','), s.toFixed(3), variant, flavor, words.fragile].join('|');
+  const key = [drawing, fog.toFixed(3), `${light.level}${light.side}`, blur, rest ? '' : JSON.stringify(pose), layered ? '' : 'whole'].join('|');
   return (rest && !variant ? sprites : gestureSprites).get(key, () => {
-    const [L, R] = EXTENT[a.pose]!;
-    const w = Math.ceil((R - L + PAD * 2) * s), h = Math.ceil((TOP + BOTTOM) * s);
-    const canvas = createCanvas(Math.max(1, w), Math.max(1, h));
+    const { w, h, ox, oy } = spriteBox(a, k);
+    const canvas = createCanvas(w, h);
     const o = canvas.getContext('2d');
-    const ox = (PAD - L) * s, oy = TOP * s;
     o.translate(ox, oy);
     o.scale(s, s);
-    paintPose(o, a, rest ? {} : pose!, flavor, words, variant);
+    // A pose of a gesture is painted over the still pieces of the cat, already rasterised.
+    paintPose(o, a, rest ? {} : pose!, flavor, words, variant, rest || !layered ? undefined : { key: drawing, get: (k, make) => layers.get(k, make) });
     grade(o, w, h, light);
     if (fog > 0) {
       // Aerial perspective: what is far melts into the room.
@@ -587,19 +602,80 @@ export function drawRoom(ctx: X, v: RoomView, height: number, sky: Sky, room: Ro
 }
 
 // ---------- Frame ----------
+/** The state a new canvas starts with: the scene assumes it. */
+function resetState(c: X): void {
+  c.globalAlpha = 1;
+  c.globalCompositeOperation = 'source-over';
+  c.filter = 'none';
+  c.fillStyle = '#000000';
+  c.strokeStyle = '#000000';
+  c.lineWidth = 1;
+  c.lineCap = 'butt';
+  c.lineJoin = 'miter';
+  c.miterLimit = 10;
+  c.setLineDash([]);
+  c.lineDashOffset = 0;
+  c.font = '10px sans-serif';
+  c.textAlign = 'start';
+  c.textBaseline = 'alphabetic';
+  c.shadowBlur = 0;
+  c.shadowColor = 'rgba(0, 0, 0, 0)';
+  c.shadowOffsetX = 0;
+  c.shadowOffsetY = 0;
+  c.imageSmoothingEnabled = true;
+}
+
+/** The scene on a canvas of its own (`width` × `height`). */
 export function renderScene(input: SceneInput): Canvas {
+  const canvas = createCanvas(input.width, input.height);
+  paintScene(canvas.getContext('2d'), 0, 0, input);
+  return canvas;
+}
+
+/**
+ * Can the scene be painted straight on `g` at (`x`, `y`) and look like
+ * `renderScene` drawn there? Yes when that corner falls on a whole pixel and
+ * nothing scales or turns. On a canvas whose corner it is (a tile the
+ * compositor keeps) the pixels are the very same; elsewhere the dithering of
+ * the gradients falls on other pixels, a level here and there.
+ */
+export function canPaintOn(g: X, x: number, y: number): boolean {
+  const t = g.getTransform();
+  return t.a === 1 && t.b === 0 && t.c === 0 && t.d === 1 && Number.isInteger(t.e + x) && Number.isInteger(t.f + y);
+}
+
+/**
+ * Paints the scene on `ctx`, its top-left corner at (`x0`, `y0`) in `ctx`'s
+ * coordinates, inside `width` × `height`, and leaves `ctx` as it was.
+ * Straight on the panel's canvas it saves a canvas the size of the scene and
+ * copying it, which in a frame of an animation is as much as the rest of
+ * the scene.
+ */
+export function paintScene(ctx: X, x0: number, y0: number, input: SceneInput): void {
   const { width, height, now, words, options } = input;
   // The little texts painted by the props speak the panel's language.
   usePropTexts(propTextsFor(words.lang));
-  const canvas = createCanvas(width, height);
-  const ctx = canvas.getContext('2d');
+  // Every absolute transform of the scene goes through here: on `ctx`'s own
+  // one, moved to (x0, y0).
+  const B = ctx.getTransform();
+  const setT = (a: number, b: number, c: number, d: number, e: number, f: number) => {
+    const E = e + x0, F = f + y0;
+    ctx.setTransform(B.a * a + B.c * b, B.b * a + B.d * b, B.a * c + B.c * d, B.b * c + B.d * d, B.a * E + B.c * F + B.e, B.b * E + B.d * F + B.f);
+  };
+  ctx.save();
+  resetState(ctx);
+  setT(1, 0, 0, 1, 0, 0);
+  ctx.beginPath();
+  ctx.rect(0, 0, width, height);
+  ctx.clip();
+
   ctx.fillStyle = BG;
   ctx.fillRect(0, 0, width, height);
 
   const v = roomView(width, height);
   const { k, RW } = v;
   // Design units → canvas pixels, and the same for x alone (sprites are drawn unscaled).
-  const toDesign = () => ctx.setTransform(k, 0, 0, k, -v.x0 * k, 0);
+  const toDesign = () => setT(k, 0, 0, k, -v.x0 * k, 0);
   const px = (x: number) => (x - v.x0) * k;
 
   const d = new Date(now);
@@ -657,7 +733,7 @@ export function renderScene(input: SceneInput): Canvas {
   // Durante un duelo la habitación se apaga un poco: la luz la ponen las espadas.
   let duelFlash = 0;
   if (live?.kind === 'duelo') {
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    setT(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = `rgba(8,10,20,${0.32 * Math.min(1, Math.sin(Math.PI * live.t) * 3)})`;
     ctx.fillRect(0, 0, width, height);
     toDesign();
@@ -743,7 +819,7 @@ export function renderScene(input: SceneInput): Canvas {
       lastBuilt = plan.set.id;
       drawBuildBehind(ctx, plan, g.t);
       const body = sprite(a, k, undefined, { level, side }, flavor, words);
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      setT(1, 0, 0, 1, 0, 0);
       ctx.drawImage(body.canvas, Math.round(px(vx) - body.ox), Math.round(vy * k - body.oy));
       toDesign();
       const t = tagInfo.get(a)!;
@@ -757,7 +833,7 @@ export function renderScene(input: SceneInput): Canvas {
       // La carrera loca: el portátil se queda solo y el gato cruza la
       // habitación en tres frames, de punta a punta, y vuelve como si nada.
       const desk = sprite(a, k, undefined, { level, side }, '', words, 'soloPortatil');
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      setT(1, 0, 0, 1, 0, 0);
       ctx.drawImage(desk.canvas, Math.round(px(vx) - desk.ox), Math.round(vy * k - desk.oy));
       toDesign();
       const u = Math.max(0, Math.min(1, (g.t - 0.25) / 0.5));
@@ -766,7 +842,7 @@ export function renderScene(input: SceneInput): Canvas {
       const stretch = Math.round(u * 2) % 2 === 0 ? 1 : 0;
       const run = runnerSprite(a, k, vs, stretch, { level, side });
       speedLines(ctx, rx, vy, vs, 1, 11 + Math.round(u * 4));
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      setT(1, 0, 0, 1, 0, 0);
       // Estela: dos copias tenues detrás, como una foto movida.
       for (const [dx, alpha] of [[-150, 0.18], [-80, 0.35], [0, 1]] as const) {
         ctx.globalAlpha = alpha;
@@ -787,7 +863,7 @@ export function renderScene(input: SceneInput): Canvas {
       const desk = sprite(a, k, undefined, light, '', words, 'soloPortatil');
       const body = sprite(a, k, undefined, light, '', words, 'sinPortatil');
       const py = (y: number) => y * k;
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      setT(1, 0, 0, 1, 0, 0);
       const put = (sp: typeof body, x: number, y: number) => ctx.drawImage(sp.canvas, Math.round(px(x) - sp.ox), Math.round(py(y) - sp.oy));
       const u = g.t;
       const sc = vs;
@@ -851,7 +927,7 @@ export function renderScene(input: SceneInput): Canvas {
           const f = (u - 0.25) / 0.6;
           const rx = vx + (right - vx) * Math.sin(Math.PI * f);
           const run = runnerSprite(a, k, vs, Math.round(f * 8) % 2, light);
-          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          setT(1, 0, 0, 1, 0, 0);
           if (f > 0.5) {
             // A la vuelta, mirando hacia la izquierda.
             ctx.save();
@@ -889,7 +965,7 @@ export function renderScene(input: SceneInput): Canvas {
         portal(ctx, gx, gy, sc, open);
         remoteDesk(ctx, far.x, far.y, 0.9, sshHost(lead.detail ?? '') || words.server);
         portal(ctx, far.x - 90, far.y - 60, far.s, u > 0.3 && u < 0.75 ? Math.min(1, Math.min(u - 0.3, 0.75 - u) / 0.08) : 0);
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        setT(1, 0, 0, 1, 0, 0);
         const scaled = (x: number, y: number, r: number) => ctx.drawImage(body.canvas, Math.round(px(x) - body.ox * r), Math.round(py(y) - body.oy * r), Math.round(body.canvas.width * r), Math.round(body.canvas.height * r));
         if (u < 0.3) {
           const f = ease(Math.max(0, (u - 0.1) / 0.2));
@@ -926,7 +1002,7 @@ export function renderScene(input: SceneInput): Canvas {
     const away = corroF > 0 && a.pose === 'portatil';
     if (away) {
       const desk = sprite(a, k, undefined, { level, side }, '', words, 'soloPortatil');
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      setT(1, 0, 0, 1, 0, 0);
       ctx.drawImage(desk.canvas, Math.round(px(a.x) - desk.ox), Math.round(a.floorY * k - desk.oy));
     }
     toDesign();
@@ -939,7 +1015,7 @@ export function renderScene(input: SceneInput): Canvas {
     toDesign();
     if (g?.kind === 'contenedor') crane(ctx, { x: vx, y: vy, s: Math.max(vs, 0.55) }, g.t);
     if (g?.kind === 'corona') royalty(ctx, vx, vy, vs);
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    setT(1, 0, 0, 1, 0, 0);
     // Durante el paseo se reescala el gato de destino: pintar uno por tamaño
     // sería repintar el pelo en cada frame.
     const r = vs / a.scale;
@@ -1088,7 +1164,7 @@ export function renderScene(input: SceneInput): Canvas {
   }
   if (live?.kind === 'confeti') confetti(ctx, RW, DESIGN_H, live.t);
   if (live?.kind === 'trueno' && live.t < 0.4) {
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    setT(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = `rgba(235,240,255,${0.55 * (1 - live.t / 0.4)})`;
     ctx.fillRect(0, 0, width, height);
     toDesign();
@@ -1110,7 +1186,7 @@ export function renderScene(input: SceneInput): Canvas {
   }
   if (live?.kind === 'cajas') fallingBox(ctx, L.zone.lo + MARGIN + 330 + ((now / 60_000) % 7) / 7 * (L.zone.hi - L.zone.lo - 390 - MARGIN), floorAt(0.97), 0.8, live.t);
   if (duelFlash > 0) {
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    setT(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = `rgba(235,240,255,${duelFlash * 0.4})`;
     ctx.fillRect(0, 0, width, height);
     toDesign();
@@ -1120,7 +1196,7 @@ export function renderScene(input: SceneInput): Canvas {
   }
 
   // Vignette: slightly darker corners keep the eye on the scene.
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  setT(1, 0, 0, 1, 0, 0);
   ctx.drawImage(vignette(width, height), 0, 0);
-  return canvas;
+  ctx.restore();
 }
